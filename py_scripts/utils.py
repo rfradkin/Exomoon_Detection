@@ -481,6 +481,7 @@ greater than 1. Currently, it's {plane_max_numbe}.")
         if curre_curve[-1, 1]['stell_radiu'] is None or \
 curre_curve[-1, 1]['stell_mass'] is None or curre_curve[-1, 1]['toi'] or \
 curre_curve[-1, 1]['eb']:
+
             continue
 
         time_axis = curre_curve[find_start(curre_curve):-1, 0].astype(float)
@@ -639,6 +640,7 @@ curre_curve[-1, 1]['eb']:
         # Add characteristics to each curve's dictionary
         curre_curve[-1, 1]['max_ampli'] = (min(relat_flux) - 1) * -1000
         curre_curve[-1, 1]['plane_numbe'] = plane_numbe
+        curre_curve[-1, 1]['curve_injec'] = True
         curre_curve[-1, 1]['type_limb_darke'] = type_limb_darke
         curre_curve[-1, 1]['linea_limb_darke_coeff'] = linea_limb_darke_coeff
         curre_curve[-1, 1]['quadr_limb_darke_coeff'] = quadr_limb_darke_coeff
@@ -649,6 +651,7 @@ curre_curve[-1, 1]['eb']:
         curre_curve[-1, 1]['type_orbit_archi'] = type_orbit_archi
         curre_curve[-1, 1]['plane_type'] = plane_type
 
+        # Multiplanetary-moon systems
         if plane_numbe > 1 or moon_numbe > 1:
             curre_curve[-1, 1]['plane_epoch'] = plane_epoch
             curre_curve[-1, 1]['plane_perio'] = plane_perio
@@ -664,21 +667,30 @@ curre_curve[-1, 1]['eb']:
             curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
             curre_curve[-1, 1]['moon_eccen'] = moon_eccen
             curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
+        # Single planet and moon systems
         elif plane_numbe:
             # Convert planet and moon numbers from lists/arrays to floats
             curre_curve[-1, 1]['plane_epoch'] = plane_epoch[0]
             curre_curve[-1, 1]['plane_perio'] = plane_perio[0]
             curre_curve[-1, 1]['plane_radiu'] = plane_radiu[0]
             curre_curve[-1, 1]['plane_mass'] = plane_mass[0]
-            curre_curve[-1, 1]['plane_incli'] = plane_incli_degre[0]
+            curre_curve[
+                -1,
+                1]['ratio_plane_stell_radiu'] = plane_radiu[0] / stell_radiu
+            curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
             curre_curve[-1, 1]['plane_eccen'] = plane_eccen
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
+
             if moon_numbe:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch[0][0]
                 curre_curve[-1, 1]['moon_perio'] = moon_perio[0][0]
                 curre_curve[-1, 1]['moon_radiu'] = moon_radiu[0][0]
                 curre_curve[-1, 1]['moon_mass'] = moon_mass[0][0]
                 curre_curve[-1, 1]['moon_numbe'] = moon_numbe[0]
+                curre_curve[-1, 1]['ratio_moon_plane_radiu'] = moon_radiu[0][
+                    0] / plane_radiu[0]
+                curre_curve[-1, 1][
+                    'ratio_moon_stell_radiu'] = moon_radiu[0][0] / stell_radiu
                 curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
