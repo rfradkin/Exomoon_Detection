@@ -6,3 +6,5 @@ pred_csv
 tensorboard
 tim_graphs
 .ipynb_checkpoints
+.gitignore
+.npy
