@@ -60,7 +60,7 @@ def retur_secto_files(secto_range, path, remov_dupli=True):
     '''Returns the file names for sectors of fits data'''
     file_names = []
     # Loops through directories to find fits files
-    for sector in range(secto_range[0], secto_range[1] + 1):
+    for sector in range(secto_range[0], secto_range[1]):
         secto_numbe = str(sector)
         if len(secto_numbe) != 2:
             secto_numbe = f'0{secto_numbe}'
@@ -713,11 +713,7 @@ between TOI ID and TIC ID.'''
     TOI_ID = np.sort(TOI_ID)
     for i in range(len(curve)):
         curve_ID = curve[i, -1, 1]['tic_id']
-        if curve_ID == TOI_ID[np.searchsorted(TOI_ID, curve_ID)]:
-            curve[i, -1, 1]['toi'] = True
-        else:
-            curve[i, -1, 1]['toi'] = False
-
+        curve[i, -1, 1]['toi'] =  curve_ID == TOI_ID[np.searchsorted(TOI_ID, curve_ID)]
 
 def retur_rando_sampl(numbe_of_sampl, data_lengt):
     '''Returns a numpy array containing a specified number of random indexes.'''
