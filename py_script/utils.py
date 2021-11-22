@@ -480,7 +480,7 @@ greater than 1. Currently, it's {plane_max_numbe}.")
         # If TOI or EB, do not inject
         if curre_curve[-1, 1]['stell_radiu'] is None or \
 curre_curve[-1, 1]['stell_mass'] is None or curre_curve[-1, 1]['toi'] or \
-curre_curve[-1, 1]['eb']:
+curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
 
             continue
 
