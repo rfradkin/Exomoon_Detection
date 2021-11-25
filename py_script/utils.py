@@ -21,6 +21,7 @@ import math
 import random
 import time
 import os
+import glob
 
 # Third-party imports
 import numpy as np
@@ -675,9 +676,8 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
             curre_curve[-1, 1]['plane_radiu'] = plane_radiu[0]
             curre_curve[-1, 1]['plane_mass'] = plane_mass[0]
             # Convert from sun radii to earth radii
-            curre_curve[
-                -1,
-                1]['ratio_plane_stell_radiu'] = plane_radiu[0] / (stell_radiu * 109.076)
+            curre_curve[-1, 1]['ratio_plane_stell_radiu'] = plane_radiu[0] / (
+                stell_radiu * 109.076)
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
             curre_curve[-1, 1]['plane_eccen'] = plane_eccen
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
@@ -690,8 +690,9 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
                 curre_curve[-1, 1]['moon_numbe'] = moon_numbe[0]
                 curre_curve[-1, 1]['ratio_moon_plane_radiu'] = moon_radiu[0][
                     0] / plane_radiu[0]
-                curre_curve[-1, 1][
-                    'ratio_moon_stell_radiu'] = moon_radiu[0][0] / (stell_radiu * 109.076)
+                curre_curve[-1,
+                            1]['ratio_moon_stell_radiu'] = moon_radiu[0][0] / (
+                                stell_radiu * 109.076)
                 curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
@@ -713,7 +714,9 @@ between TOI ID and TIC ID.'''
     TOI_ID = np.sort(TOI_ID)
     for i in range(len(curve)):
         curve_ID = curve[i, -1, 1]['tic_id']
-        curve[i, -1, 1]['toi'] =  curve_ID == TOI_ID[np.searchsorted(TOI_ID, curve_ID)]
+        curve[i, -1,
+              1]['toi'] = curve_ID == TOI_ID[np.searchsorted(TOI_ID, curve_ID)]
+
 
 def retur_rando_sampl(numbe_of_sampl, data_lengt):
     '''Returns a numpy array containing a specified number of random indexes.'''
@@ -848,10 +851,10 @@ def show_preci_recal(predi,
     plt.show()
 
 
-def inser_negat_one(curve, max_time_gap, caden=2):
-    '''Inserts a -1 into the curve at the provided cadence (mins)\
-given that the gap between the two points is less than \
-the max gap time (mins) for the flux value.'''
+def inser_inter_spot(curve, max_time_gap, caden=2):
+    '''Inserts a string of \'inter_spot\' into the curve at the \
+provided cadence (mins) given that the gap between the two points \
+is less than the max gap time (mins) for the flux value.'''
     # Convert max time gap and cadence from mins to days
     max_time_gap /= 1440
     caden /= 1440
@@ -865,8 +868,8 @@ the max gap time (mins) for the flux value.'''
         # Check if there is a gap and if it less than the max_time_gap
         if curve[i + 1][0] - curve[i][0] > (2 * caden) and \
 curve[i + 1][0] - curve[i][0] < max_time_gap:
-            # Insert -1
-            curve.insert(i + 1, [curve[i][0] + caden, -1])
+            # Insert 'inter_spot'
+            curve.insert(i + 1, [curve[i][0] + caden, 'inter_spot'])
         else:
             i += 1
     return curve
@@ -914,21 +917,21 @@ length.'''
 
 
 def inter_curve(curve, splin_type):
-    '''Interpolate a spline to the None points within the curve.'''
+    '''Interpolate a spline to the \'inter_spot\' points within the curve.'''
     # Create the x and y values for the spline
-    x = curve[np.where(curve[find_start(curve):-1, 1] != -1)[0],
-              0].astype(float)
-    y = curve[np.where(curve[find_start(curve):-1, 1] != -1)[0],
-              1].astype(float)
+    x = curve[np.where(curve[:-1, 1] != 'inter_spot')[0], 0].astype(float)
+    x = x[find_start(curve):]
+    y = curve[np.where(curve[:-1, 1] != 'inter_spot')[0], 1].astype(float)
+    y = y[find_start(curve):]
     # Create a function of type splin_type
     inter = scipy.interpolate.interp1d(x,
                                        y,
                                        kind=splin_type,
                                        fill_value='extrapolate')
-    # Find values of -1 in the function and find their value in the
-    # interpolation. Then set the -1 value to the interpolated value
+    # Find values of 'inter_spot' in the function and find their value in the
+    # interpolation. Then set the 'inter_spot' value to the interpolated value
     for i in range(len(curve) - 1):
-        if curve[i, 1] == -1:
+        if curve[i, 1] == 'inter_spot':
             curve[i, 1] = inter(curve[i, 0])
     return curve
 
@@ -1465,3 +1468,11 @@ def show_featu_preci_recal(data,
         if save_figur_path:
             plt.savefig(f'{save_figur_path}pr_curve-{float(time.time())}.pdf')
         figur.show()
+
+        
+def retur_most_recen(folde_path):
+    '''Returns the name of the most recent file.'''
+    if folde_path[-1] != '/':
+        folde_path = f'{folde_path}/'
+    files_in_folde = glob.glob(f'{folde_path}*')
+    return max(files_in_folde, key=os.path.getctime).split('/')[-1]
