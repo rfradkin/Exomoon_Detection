@@ -132,7 +132,7 @@ def retur_fits_data(curve_names, featu, path):
     return curves
 
 
-def creat_confu_matri(data, predi, cutof=0.5):
+def creat_confu_matri(data, predi, cutof=0.5, detec_type='plane_moon_cut_injec'):
     '''Returns a list of numpy arrays containing true positives, \
 true negatives, false positives, and false negatives.'''
     # Turn predictions into binary predictions based on the cutoff
@@ -150,12 +150,12 @@ true negatives, false positives, and false negatives.'''
     # Create the confusion matrix lists
     for i in range(len(data)):
         if true_false[i]:
-            if data[i, -1, 1]['plane_cut_injec']:  ###
+            if data[i, -1, 1][detec_type]:  
                 true_posit.append(i)
             else:
                 true_negat.append(i)
         else:
-            if data[i, -1, 1]['plane_cut_injec']:  ###
+            if data[i, -1, 1][detec_type]:  
                 false_negat.append(i)
             else:
                 false_posit.append(i)
@@ -172,6 +172,7 @@ def show_confu_matri(data,
                      cutof=0.5,
                      featu=None,
                      bins=1,
+                     detec_type='plane_moon_cut_injec',
                      ignore_string_none=True,
                      save_figur_path='',
                      width=6,
@@ -192,7 +193,7 @@ def show_confu_matri(data,
             plt.subplot(numbe_rows, numbe_colum, i + 1)
             # Mark TP, TN, FP, FN
             marke_data = creat_confu_matri(
-                data[binne_data[i][:, 0].astype(int)], predi, cutof)
+                data[binne_data[i][:, 0].astype(int)], predi, cutof, detec_type)
             confu_matrix = np.array([[len(marke_data[1]),
                                       len(marke_data[2])],
                                      [len(marke_data[3]),
@@ -206,7 +207,7 @@ def show_confu_matri(data,
     else:
         plt.figure(figsize=(width, heigh))
         # Mark TP, TN, FP, FN
-        marke_data = confu_matri(data, predi, cutof)
+        marke_data = creat_confu_matri(data, predi, cutof, detec_type)
         confu_matrix = np.array([[len(marke_data[1]),
                                   len(marke_data[2])],
                                  [len(marke_data[3]),
@@ -301,15 +302,13 @@ and value of binned ascending numerical data or based on their string feature.''
     return binne_data
 
 
-###
-# Change back to planmoon only
-###
 def show_tpr_fpr(data,
                  predi,
                  cutof,
                  featu,
                  bins=35,
                  overp=False,
+                 detec_type='plane_moon_cut_injec',
                  save_figur_path='',
                  width=20,
                  heigh=5):
@@ -322,18 +321,18 @@ TPR and FPR in two plots or overlayed in one.'''
     # Binary prediction
     binar_predi = predi > cutof
     for i in range(len(data)):
-        curre_featu = data[i, -1, 1]['plane_cut_injec']  ###
+        curre_featu = data[i, -1, 1][detec_type]  
         if not isinstance(curre_featu,
                           (int, float)) and curre_featu is not None:
             raise TypeError(f'')
-        if data[i, -1, 1]['plane_cut_injec'] == binar_predi[i]:  ###
+        if data[i, -1, 1][detec_type] == binar_predi[i]:  
             if curre_featu:
                 if data[i, -1, 1][featu] is not None:
                     infor.append([data[i, -1, 1][featu], True, False, False])
             else:
                 if data[i, -1, 1][featu] is not None:
                     infor.append([data[i, -1, 1][featu], False, True, False])
-        elif not data[i, -1, 1]['plane_cut_injec'] and binar_predi[i]:  ###
+        elif not data[i, -1, 1][detec_type] and binar_predi[i]: 
             if data[i, -1, 1][featu] is not None:
                 infor.append([data[i, -1, 1][featu], False, False, True])
     infor = np.array(infor)
@@ -551,7 +550,7 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
                 moon_smax[i] = np.empty(moon_numbe[i])
                 moon_radiu[i] = tdpy.icdf_powr(
                     np.random.rand(moon_numbe[i]), 0.1, 0.6,
-                    2.) * plane_radiu[i]  ### multiply by radius of the planet
+                    2.) * plane_radiu[i]  
                 moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
                 moon_densi[i] = moon_mass[i] / moon_radiu[i]**3
                 moon_min_smax = ephesus.retr_radiroch(plane_radiu[i],
@@ -910,7 +909,7 @@ length.'''
                 for i in range(0, len(curre_cut), stand_lengt - 1):
                     curre_cut_cut = curre_cut[i:i + stand_lengt - 1]
                     curre_cut_cut.append(['infor', infor.copy()])
-                    if len(curre_cut_cut) <= stand_lengt:
+                    if min_lengt < len(curre_cut_cut) <= stand_lengt:
                         cuts.append(np.array(curre_cut_cut).astype(object))
     # A list of numpy arrays
     return cuts
@@ -1152,10 +1151,11 @@ def log_predi_infor(data,
                     path,
                     model_name,
                     datas_name,
+                    first_colum=['predi', 'plane_moon_cut_injec', 'plane_cut_injec'],
                     ignor_featu=['signa', 'forma_names']):
     '''Logs prediction data and features to given path.'''
     # Create list of desired features
-    featu = []
+    featu = ['predi']
     for curre_featu in data[0, -1, 1]:
         if curre_featu not in ignor_featu:
             featu.append(curre_featu)
@@ -1174,16 +1174,19 @@ def log_predi_infor(data,
     # Calculate accuracy
     accur = sum(retur_predi_true_false((predi > 0.5), predi)) / len(predi)
     # Create metadata
-    infor = {'model_file':model_name, 'accur':accur, 'train_for':'Exomoons', \
-'train_on':datas_name, 'notes':'Accuracy is calculated with a cutoff of 0.5'}
+    infor = f'"model_file":{model_name}, "accur":{accur}, "train_for":"Exomoons", \
+"train_on":{datas_name}, "notes":"Accuracy is calculated with a cutoff of 0.5"'
     metad = np.full(len(featu), np.NaN).astype(object)
-    metad[0] = infor
+    metad[0] = 1
 
-    # Move metadata to the first cell
+    # Insert metadata spot to the first row and sort by predi
     log_infor.loc[-1] = metad
-    log_infor.index = log_infor.index + 1
-    log_infor = log_infor.sort_index()
-
+    log_infor.sort_values(by=['predi'], ascending=False, inplace=True)
+    # Put first_colum in front
+    log_infor = log_infor[first_colum + [colum for colum in log_infor if colum not in first_colum]]
+    # Insert metadata information
+    log_infor.iloc[0, 0] = infor
+    
     # Log csv to path
     log_infor.to_csv(f'{path}{datas_name}_{model_name}_{time.time()}.csv')
 
@@ -1194,6 +1197,7 @@ def show_predi_compa(data,
                      start_stop,
                      statu,
                      featu=[],
+                     detec_type='plane_moon_cut_injec',
                      save_figur_path='',
                      width=20,
                      heigh=5):
@@ -1207,26 +1211,26 @@ a desired status.'''
     # Find tp, fp, tn, fn
     for i in range(len(data)):
         if statu == 'posit':
-            if data[i, -1, 1]['plane_cut_injec'] and binar_predi[i]:  ###
+            if data[i, -1, 1][detec_type] and binar_predi[i]:
                 tp.append(i)
-            elif not data[i, -1, 1]['plane_cut_injec'] and binar_predi[i]:  ###
+            elif not data[i, -1, 1][detec_type] and binar_predi[i]:
                 fp.append(i)
         elif statu == 'negat':
             if not data[i, -1,
-                        1]['plane_cut_injec'] and not binar_predi[i]:  ###
+                        1][detec_type] and not binar_predi[i]:
                 tn.append(i)
-            elif data[i, -1, 1]['plane_cut_injec'] and not binar_predi[i]:  ###
+            elif data[i, -1, 1][detec_type] and not binar_predi[i]:
                 fn.append(i)
         elif statu == 'true':
-            if data[i, -1, 1]['plane_cut_injec'] and binar_predi[i]:  ###
+            if data[i, -1, 1][detec_type] and binar_predi[i]:
                 tp.append(i)
             elif not data[i, -1,
-                          1]['plane_cut_injec'] and not binar_predi[i]:  ###
+                          1][detec_type] and not binar_predi[i]:
                 tn.append(i)
         elif statu == 'false':
-            if not data[i, -1, 1]['plane_cut_injec'] and binar_predi[i]:  ###
+            if not data[i, -1, 1][detec_type] and binar_predi[i]:
                 fp.append(i)
-            elif data[i, -1, 1]['plane_cut_injec'] and not binar_predi[i]:  ###
+            elif data[i, -1, 1][detec_type] and not binar_predi[i]:
                 fn.append(i)
         else:
             raise ValueError(
