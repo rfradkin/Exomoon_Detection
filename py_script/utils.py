@@ -13,6 +13,9 @@
 
 # Consider changing y_data to y_true and predi to y_data to reflect industry standards.
 
+# Update cut times to reflect the portion of the curve that is cut off due to longer
+# than standard length
+
 ###
 
 # Standard libraries
@@ -710,11 +713,9 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
 def mark_TOI(curve, TOI_ID):
     '''Mark TESS Objects of Interest (TOIs) through a comparison \
 between TOI ID and TIC ID.'''
-    TOI_ID = np.sort(TOI_ID)
     for i in range(len(curve)):
         curve_ID = curve[i, -1, 1]['tic_id']
-        curve[i, -1,
-              1]['toi'] = curve_ID == TOI_ID[np.searchsorted(TOI_ID, curve_ID)]
+        curve[i, -1, 1]['toi'] = bool(len(np.where(TOI_ID == curve_ID)[0]))
 
 
 def retur_rando_sampl(numbe_of_sampl, data_lengt):
@@ -1046,8 +1047,11 @@ def show_curve(data,
                show_signa=False,
                ignor_zeros=True,
                save_figur_path=None,
-               width=15,
-               heigh=5):
+               figur_chara={'figsize': [15, 5]},
+               title_chara={},
+               x_chara={},
+               y_chara={},
+               legen_chara={}):
     '''Shows curves from start to stop index values, or a \
 single TIC ID (if cuts, will show all). Includes features and can \
 highlight injection times.'''
@@ -1068,10 +1072,14 @@ highlight injection times.'''
         raise ValueError(
             f'Start stop index must be in [start, stop] or [TIC ID] format. \
 Currently: {start_stop_tic_id}.')
-
-    figur, axes = plt.subplots((stop - start),
-                               1,
-                               figsize=(width, heigh * (stop - start)))
+    # Increase the height of the figure based on 
+    # the number of curves if the figure size is
+    # specified
+    try:
+        figur_chara['figsize'][1] *= (stop - start)
+    except:
+        warnings.warn('Figure size not specified.', RuntimeWarning)
+    figur, axes = plt.subplots((stop - start), 1, **figur_chara)
     # Create a list of axes to be accessed if only one curve
     if stop - start == 1:
         axes = [axes]
@@ -1100,8 +1108,8 @@ Currently: {start_stop_tic_id}.')
                                     s=0.4,
                                     c=retur_curve_color(data[i]))
         title = f'{retur_title(data[i], featu, "", ignor_zeros)}'
-        axes[i - start].set_xlabel('Time [BJD]')
-        axes[i - start].set_ylabel('Relative Flux')
+        axes[i - start].set_xlabel('Time [BJD]', **x_chara)
+        axes[i - start].set_ylabel('Relative Flux', **y_chara)
         # Highlight injection times
         if highl_injec:
             injec_label_name = 'Planet'
@@ -1119,7 +1127,7 @@ Currently: {start_stop_tic_id}.')
                                                 alpha=0.22,
                                                 label=injec_label_name)
                         injec_label_name = None
-                        axes[i - start].legend()
+                        axes[i - start].legend(**legen_chara)
         # Highlight cut times
         if highl_cuts and data[i, -1, 1]['cut_numbe'] is None and \
 data[i, -1, 1]['cut_times'] is not None:
@@ -1133,7 +1141,7 @@ data[i, -1, 1]['cut_times'] is not None:
                                         alpha=0.07)
             title = f'{title}\nCuts Appear in Alternating Highlights'
 
-        axes[i - start].set_title(title)
+        axes[i - start].set_title(title, **title_chara)
 
     for delet in remov_axes:
         ### Figure out way to hide extra whitespace from deleted axes
