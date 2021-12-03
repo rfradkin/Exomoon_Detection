@@ -467,26 +467,37 @@ def injec_curve(curve,
                 plane_max_numbe=1,
                 moon_max_numbe=1,
                 type_orbit_archi='planmoon',
+                separ_plane_moon=False,
+                reinj=False,
                 anima_path=None):
     '''Returns an injected light curve with exoplanets and exomoons.'''
-    if type_orbit_archi == 'planmoon' and (plane_max_numbe < 1
-                                           or moon_max_numbe < 1):
-        raise ValueError(f"The maximum number of planets and moons must be \
-greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively."
-                         )
-    elif type_orbit_archi == 'plan' and plane_max_numbe < 1:
-        raise ValueError(f"The maximum number of planets must be \
-greater than 1. Currently, it's {plane_max_numbe}.")
+    if not reinj:
+        if plane_max_numbe < 1:
+            raise ValueError(f"The maximum number of planets must be \
+    greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively.")
+        elif type_orbit_archi == 'planmoon' and moon_max_numbe < 1:
+            raise ValueError(f"The maximum number of moons must be \
+    greater than 1 for a planet moon injection. Currently, it's {moon_max_numbe}.")
+        
+    # Increase the number of dimensions if only a single curve is provided
+    if len(curve.shape) == 2:
+        curve = [curve]
 
     for curre_curve in curve:
         # If stellar radius or stellar mass is missing, do not inject
         # If TOI or EB, do not inject
         if curre_curve[-1, 1]['stell_radiu'] is None or \
 curre_curve[-1, 1]['stell_mass'] is None or curre_curve[-1, 1]['toi'] or \
-curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
-
+curre_curve[-1, 1]['eb']:
             continue
-
+            
+        if curre_curve[-1, 1]['curve_type'] != 'Light Curve' and not reinj:
+            warnings.warn("Trying to inject an injected curve. Do you mean to turn 'reinj' on? ", RuntimeWarning)
+            continue
+        if curre_curve[-1, 1]['curve_type'] == 'Light Curve' and reinj:
+            warnings.warn("Trying to reinject a uninjected curve. Do you mean to turn 'reinj' off? ", RuntimeWarning)
+            continue
+            
         time_axis = curre_curve[find_start(curre_curve):-1, 0].astype(float)
         time_min = np.amin(time_axis)
         time_max = np.amax(time_axis)
@@ -498,101 +509,148 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
         stell_radiu = curre_curve[-1, 1]['stell_radiu']
         stell_mass = curre_curve[-1, 1]['stell_mass']
 
-        # Planets
-        plane_numbe = np.random.randint(1, plane_max_numbe + 1)
-        plane_index = np.arange(plane_numbe)
-        plane_perio = np.empty(plane_numbe)
-        plane_epoch = np.empty(plane_numbe)
-        plane_incli_radia = np.empty(plane_numbe)
-        plane_incli_degre = np.empty(plane_numbe)
-        # Assign planet feature values
-        for i in plane_index:
-            plane_perio[i] = np.random.random() * 5 + 2
-            plane_incli_radia[i] = np.random.random() * 0.04
-            plane_incli_degre[i] = 180. / np.pi * np.arccos(
-                plane_incli_radia[i])
-        plane_epoch = tdpy.icdf_self(np.random.rand(plane_numbe), time_min,
-                                     time_max)
-        plane_eccen = 0
-        plane_sin_w = 0
-        if type_orbit_archi == 'planmoon' or type_orbit_archi == 'plan':
-            plane_radiu = np.empty(plane_numbe)
-            for i in plane_index:
-                plane_radiu[i] = 10 * np.random.random() + 1
-            plane_mass = ephesus.retr_massfromradi(plane_radiu)
-            plane_densi = plane_mass / plane_radiu**3
-
-        # Approximate total mass of the system
-        total_mass = stell_mass
-        plane_smax = ephesus.retr_smaxkepl(plane_perio, total_mass)
-        rsma = None
-
-        # Moon characteristics
-        if type_orbit_archi.endswith('moon'):
-            moon_numbe = np.empty(plane_numbe, dtype=int)
-            moon_radiu = [[] for i in plane_index]
-            moon_mass = [[] for i in plane_index]
-            moon_densi = [[] for i in plane_index]
-            moon_perio = [[] for i in plane_index]
-            moon_epoch = [[] for i in plane_index]
-            moon_smax = [[] for i in plane_index]
-            moon_index = [[] for i in plane_index]
-            # Hill radius of the planet
-            radihill = ephesus.retr_radihill(plane_smax,
-                                             plane_mass / dictfact['msme'],
-                                             stell_mass)
-            # Maximum semi-major axis of the moons
-            moon_max_smax = 0.5 * radihill
-            total_mass = np.sum(plane_mass) / dictfact['msme'] + stell_mass
-            for i in plane_index:
-                arry = np.arange(1, moon_max_numbe + 1)
-                prob = arry**(-2.)
-                prob /= np.sum(prob)
-                moon_numbe[i] = np.random.choice(arry, p=prob)
-                moon_index[i] = np.arange(moon_numbe[i])
-                moon_smax[i] = np.empty(moon_numbe[i])
-                moon_radiu[i] = tdpy.icdf_powr(
-                    np.random.rand(moon_numbe[i]), 0.1, 0.6,
-                    2.) * plane_radiu[i]  
-                moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
-                moon_densi[i] = moon_mass[i] / moon_radiu[i]**3
-                moon_min_smax = ephesus.retr_radiroch(plane_radiu[i],
-                                                      plane_densi[i],
-                                                      moon_densi[i])
-                for ii in moon_index[i]:
-                    moon_smax[i][ii] = tdpy.icdf_powr(np.random.rand(),
-                                                      moon_min_smax[ii],
-                                                      moon_max_smax[i], 2.)
-                moon_perio[i] = ephesus.retr_perikepl(moon_smax[i], total_mass)
-                moon_epoch[i] = tdpy.icdf_self(np.random.rand(moon_numbe[i]),
-                                               time_min, time_max)
-            # Check to make sure realistic semi-major axis length
-            if (moon_smax[i] > plane_smax[i] / 1.2).any():
-                continue
-            # Not used in simulation at the moment
-            moon_eccen = 0
-            moon_sin_w = 0
-            moon_incli_radia = 0
+        if reinj:
+            # Copy values from previously injected curve
+            plane_numbe = curre_curve[-1, 1]['plane_numbe']
+            if plane_numbe == 1:
+                plane_perio = [curre_curve[-1, 1]['plane_perio']]
+                plane_epoch = [curre_curve[-1, 1]['plane_epoch']]
+                plane_radiu = [curre_curve[-1, 1]['plane_radiu']]
+                plane_mass = [curre_curve[-1, 1]['plane_mass']]
+                plane_incli_degre = curre_curve[-1, 1]['plane_incli']
+                plane_eccen = curre_curve[-1, 1]['plane_eccen']
+                plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
+            else:
+                plane_perio = curre_curve[-1, 1]['plane_perio']
+                plane_epoch = curre_curve[-1, 1]['plane_epoch']
+                plane_incli_degre = curre_curve[-1, 1]['plane_incli']
+                plane_radiu = curre_curve[-1, 1]['plane_radiu']
+                plane_mass = curre_curve[-1, 1]['plane_mass'] 
+                plane_eccen = curre_curve[-1, 1]['plane_eccen']
+                plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
+            
+            moon_numbe = curre_curve[-1, 1]['moon_numbe']
+            if moon_numbe == 1:
+                moon_perio = [np.array([curre_curve[-1, 1]['moon_perio']])]
+                moon_epoch = [np.array([curre_curve[-1, 1]['moon_epoch']])]
+                moon_radiu = [np.array([curre_curve[-1, 1]['moon_radiu']])]
+                moon_mass = [[curre_curve[-1, 1]['moon_mass']]]
+                moon_eccen = curre_curve[-1, 1]['moon_eccen']
+                moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
+                moon_incli_radia = curre_curve[-1, 1]['moon_incli'] * np.pi / 180
+            else:
+                moon_perio = curre_curve[-1, 1]['moon_perio']
+                moon_epoch = curre_curve[-1, 1]['moon_epoch']
+                moon_radiu = curre_curve[-1, 1]['moon_radiu']
+                moon_mass = curre_curve[-1, 1]['moon_mass']
+                moon_eccen = curre_curve[-1, 1]['moon_eccen']
+                moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
+                moon_incli_radia = None
+                if curre_curve[-1, 1]['moon_incli'] is not None: 
+                    moon_incli_radia = curre_curve[-1, 1]['moon_incli'] * np.pi / 180
+                    
+            plane_type = curre_curve[-1, 1]['plane_type']
+            type_limb_darke = curre_curve[-1, 1]['type_limb_darke']
+            linea_limb_darke_coeff = curre_curve[-1, 1]['linea_limb_darke_coeff']
+            trape_trans = curre_curve[-1, 1]['trape_trans']
+            quadr_limb_darke_coeff = curre_curve[-1, 1]['quadr_limb_darke_coeff']
+            
         else:
-            moon_perio = moon_epoch = moon_mass = moon_radiu \
-= moon_incli_radia = moon_eccen = moon_sin_w = None
-            moon_numbe = 0
-            rsma = ephesus.retr_rsma(plane_radiu, stell_radiu, plane_smax)
+            # Planets
+            plane_numbe = np.random.randint(1, plane_max_numbe + 1)
+            plane_index = np.arange(plane_numbe)
+            plane_perio = np.empty(plane_numbe)
+            plane_epoch = np.empty(plane_numbe)
+            plane_incli_radia = np.empty(plane_numbe)
+            plane_incli_degre = np.empty(plane_numbe)
+            # Assign planet feature values
+            for i in plane_index:
+                plane_perio[i] = np.random.random() * 5 + 2
+                plane_incli_radia[i] = np.random.random() * 0.04
+                plane_incli_degre[i] = 180. / np.pi * np.arccos(
+                    plane_incli_radia[i])
+            plane_epoch = tdpy.icdf_self(np.random.rand(plane_numbe), time_min,
+                                         time_max)
+            plane_eccen = 0
+            plane_sin_w = 0
+            if type_orbit_archi == 'planmoon' or type_orbit_archi == 'plan':
+                plane_radiu = np.empty(plane_numbe)
+                for i in plane_index:
+                    plane_radiu[i] = 10 * np.random.random() + 1
+                plane_mass = ephesus.retr_massfromradi(plane_radiu)
+                plane_densi = plane_mass / plane_radiu**3
 
-        # Simulation settings
-        trape_trans = False
-        plane_type = 'plan'
-        type_limb_darke = 'none'
-        linea_limb_darke_coeff = 0.2
-        quadr_limb_darke_coeff = 0.2
+            # Approximate total mass of the system
+            total_mass = stell_mass
+            plane_smax = ephesus.retr_smaxkepl(plane_perio, total_mass)
+            rsma = None
+
+            # Moon characteristics
+            if type_orbit_archi.endswith('moon'):
+                moon_numbe = np.empty(plane_numbe, dtype=int)
+                moon_radiu = [[] for i in plane_index]
+                moon_mass = [[] for i in plane_index]
+                moon_densi = [[] for i in plane_index]
+                moon_perio = [[] for i in plane_index]
+                moon_epoch = [[] for i in plane_index]
+                moon_smax = [[] for i in plane_index]
+                moon_index = [[] for i in plane_index]
+                # Hill radius of the planet
+                radihill = ephesus.retr_radihill(plane_smax,
+                                                 plane_mass / dictfact['msme'],
+                                                 stell_mass)
+                # Maximum semi-major axis of the moons
+                moon_max_smax = 0.5 * radihill
+                total_mass = np.sum(plane_mass) / dictfact['msme']
+                for i in plane_index:
+                    arry = np.arange(1, moon_max_numbe + 1)
+                    prob = arry**(-2.)
+                    prob /= np.sum(prob)
+                    moon_numbe[i] = np.random.choice(arry, p=prob)
+                    moon_index[i] = np.arange(moon_numbe[i])
+                    moon_smax[i] = np.empty(moon_numbe[i])
+                    moon_radiu[i] = tdpy.icdf_powr(
+                        np.random.rand(moon_numbe[i]), 0.1, 0.6,
+                        2.) * plane_radiu[i]  
+                    moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
+                    moon_densi[i] = moon_mass[i] / moon_radiu[i]**3
+                    moon_min_smax = ephesus.retr_radiroch(plane_radiu[i],
+                                                          plane_densi[i],
+                                                          moon_densi[i])
+                    for ii in moon_index[i]:
+                        moon_smax[i][ii] = tdpy.icdf_powr(np.random.rand(),
+                                                          moon_min_smax[ii],
+                                                          moon_max_smax[i], 2.)
+                    moon_perio[i] = ephesus.retr_perikepl(moon_smax[i], total_mass)
+                    moon_epoch[i] = tdpy.icdf_self(np.random.rand(moon_numbe[i]),
+                                                   time_min, time_max)
+                # Check to make sure realistic semi-major axis length
+                if (moon_smax[i] > plane_smax[i] / 1.2).any():
+                    continue
+                # Not used in simulation at the moment
+                moon_eccen = 0
+                moon_sin_w = 0
+                moon_incli_radia = 0
+            else:
+                moon_perio = moon_epoch = moon_mass = moon_radiu \
+= moon_incli_radia = moon_eccen = moon_sin_w = None
+                moon_numbe = 0
+                rsma = ephesus.retr_rsma(plane_radiu, stell_radiu, plane_smax)
+
+            # Simulation settings
+            trape_trans = True
+            plane_type = 'plan'
+            type_limb_darke = 'none'
+            linea_limb_darke_coeff = 0.2
+            quadr_limb_darke_coeff = 0.2
 
         # Create animation
         anima_name = ''
         if anima_path is not None:
             anima_name = f'{curre_curve[-1, 1]["tic_id"]}-{float(time.time())}'
-
+        
         # Generate signal
-        relat_flux = ephesus.retr_rflxtranmodl(
+        relat_flux_dicti = ephesus.retr_rflxtranmodl(
             time_axis,
             stell_radiu,
             plane_perio,
@@ -613,10 +671,12 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
             coeflmdklinr=linea_limb_darke_coeff,
             booltrap=trape_trans,
             coeflmdkquad=quadr_limb_darke_coeff,
-            rsma=rsma,
             pathanim=anima_path,
             strgextn=anima_name,
+            boolcompmoon=separ_plane_moon
         )
+        
+        relat_flux = relat_flux_dicti['rflx']        
 
         # Remove possible first value edge case
         if relat_flux[0] != 1 and relat_flux[1] == 1:
@@ -655,12 +715,14 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
         curre_curve[-1, 1]['plane_type'] = plane_type
 
         # Multiplanetary-moon systems
+        print(plane_numbe)
+        print(moon_numbe)
         if plane_numbe > 1 or moon_numbe > 1:
             curre_curve[-1, 1]['plane_epoch'] = plane_epoch
             curre_curve[-1, 1]['plane_perio'] = plane_perio
             curre_curve[-1, 1]['plane_radiu'] = plane_radiu
             curre_curve[-1, 1]['plane_mass'] = plane_mass
-            curre_curve[-1, 1]['plane_incli_degre'] = plane_incli_degre
+            curre_curve[-1, 1]['plane_incli'] = plane_incli_degre
             curre_curve[-1, 1]['plane_eccen'] = plane_eccen
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
             curre_curve[-1, 1]['moon_epoch'] = moon_epoch
@@ -677,6 +739,7 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
             curre_curve[-1, 1]['plane_perio'] = plane_perio[0]
             curre_curve[-1, 1]['plane_radiu'] = plane_radiu[0]
             curre_curve[-1, 1]['plane_mass'] = plane_mass[0]
+            curre_curve[-1, 1]['plane_incli'] = plane_incli_degre
             # Convert from sun radii to earth radii
             curre_curve[-1, 1]['ratio_plane_stell_radiu'] = plane_radiu[0] / (
                 stell_radiu * 109.076)
@@ -689,7 +752,7 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
                 curre_curve[-1, 1]['moon_perio'] = moon_perio[0][0]
                 curre_curve[-1, 1]['moon_radiu'] = moon_radiu[0][0]
                 curre_curve[-1, 1]['moon_mass'] = moon_mass[0][0]
-                curre_curve[-1, 1]['moon_numbe'] = moon_numbe[0]
+                curre_curve[-1, 1]['moon_numbe'] = moon_numbe
                 curre_curve[-1, 1]['ratio_moon_plane_radiu'] = moon_radiu[0][
                     0] / plane_radiu[0]
                 curre_curve[-1,
@@ -698,6 +761,9 @@ curre_curve[-1, 1]['eb'] or curre_curve[-1, 1]['curve_injec']:
                 curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
+                if separ_plane_moon:
+                    curre_curve[-1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
+                    curre_curve[-1, 1]['moon_signa'] = relat_flux_dicti['rflxmoon']
             else:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch
                 curre_curve[-1, 1]['moon_perio'] = moon_perio
@@ -1391,7 +1457,7 @@ def show_featu_preci_recal(data,
     if featu is None or featu == 'predi' or data is None:
         show_preci_recal(predi, y_data, cutof, save_figur_path, width, heigh)
     else:
-        binn_data = utils.bin_data(data, featu, bins)
+        binn_data = bin_data(data, featu, bins)
         preci = []
         recal = []
         for i in range(len(bin_data)):
