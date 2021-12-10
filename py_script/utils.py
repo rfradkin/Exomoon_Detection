@@ -227,9 +227,48 @@ def show_confu_matri(data,
     plt.show()
 
 
-def bin_data(data, featu, bins=1, ignor_strin_none=True):
+def bin_data(data, featu, bins=1, equal_width_bins=True, ignor_strin_none=True):
     '''Returns a list of numpy arrays containing the index \
 and value of binned ascending numerical data or based on their string feature.'''
+    
+    # Bin the data based on the spread of the feature, not the 
+    # occurence rate of a feature
+    if equal_width_bins:
+        unord_data = []
+        # Extract the index and feature
+        for i in range(len(data)):
+            if isinstance(data[i, -1, 1][featu], (float, int)):
+                unord_data.append([i, data[i, -1, 1][featu]])
+        # Raise error if no data is returned
+        if not len(unord_data):
+            raise RuntimeError(f'No numerical binnable data provided.')
+
+        # Convert the unordered data to an array
+        unord_data = np.array(unord_data)
+        # Sort the unordered data in ascending order based on the feature
+        index_order = np.argsort(unord_data[:, 1])
+        order_infor = unord_data[index_order]
+
+        # Determin the bin length through splitting the min and max feature values
+        featu_min = min(order_infor[:, 1])
+        featu_max = max(order_infor[:, 1])
+        bin_lengt = (featu_max - featu_min) / bins
+        binne_data = []
+
+        # Bin all the data except the last bin
+        start_index = 0
+        for i in range(0, bins - 1):
+            for ii in range(start_index, len(order_infor)):
+                if order_infor[ii, 1] > (i + 1) * bin_lengt + featu_min:
+                    binne_data.append(order_infor[start_index:ii])
+                    start_index = ii
+                    break
+        # Add the last bin
+        binne_data.append(order_infor[start_index:])
+        # Return binned data, list of arrays in index, feature format
+        return binne_data      
+    
+    # Bin the data based on the occurence rate of a feature
     binne_data = []
     strin_featu = []
     for i in range(len(data)):
@@ -290,7 +329,7 @@ and value of binned ascending numerical data or based on their string feature.''
         raise ValueError(
             f'The number of bins must be greater than 0. Currently: {bins}.')
     if bins == 1:
-        return np.array(order_infor)
+        return [np.array(order_infor)]
 
     lengt_bins = len(order_infor) // bins
     # Bin the data
@@ -517,7 +556,7 @@ curre_curve[-1, 1]['eb']:
                 plane_epoch = [curre_curve[-1, 1]['plane_epoch']]
                 plane_radiu = [curre_curve[-1, 1]['plane_radiu']]
                 plane_mass = [curre_curve[-1, 1]['plane_mass']]
-                plane_incli_degre = curre_curve[-1, 1]['plane_incli']
+                plane_incli_degre = np.array([curre_curve[-1, 1]['plane_incli']])
                 plane_eccen = curre_curve[-1, 1]['plane_eccen']
                 plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
             else:
@@ -538,6 +577,7 @@ curre_curve[-1, 1]['eb']:
                 moon_eccen = curre_curve[-1, 1]['moon_eccen']
                 moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
                 moon_incli_radia = curre_curve[-1, 1]['moon_incli'] * np.pi / 180
+                moon_numbe = np.array([moon_numbe])
             else:
                 moon_perio = curre_curve[-1, 1]['moon_perio']
                 moon_epoch = curre_curve[-1, 1]['moon_epoch']
@@ -715,8 +755,6 @@ curre_curve[-1, 1]['eb']:
         curre_curve[-1, 1]['plane_type'] = plane_type
 
         # Multiplanetary-moon systems
-        print(plane_numbe)
-        print(moon_numbe)
         if plane_numbe > 1 or moon_numbe > 1:
             curre_curve[-1, 1]['plane_epoch'] = plane_epoch
             curre_curve[-1, 1]['plane_perio'] = plane_perio
@@ -739,7 +777,7 @@ curre_curve[-1, 1]['eb']:
             curre_curve[-1, 1]['plane_perio'] = plane_perio[0]
             curre_curve[-1, 1]['plane_radiu'] = plane_radiu[0]
             curre_curve[-1, 1]['plane_mass'] = plane_mass[0]
-            curre_curve[-1, 1]['plane_incli'] = plane_incli_degre
+            curre_curve[-1, 1]['plane_incli'] = plane_incli_degre[0]
             # Convert from sun radii to earth radii
             curre_curve[-1, 1]['ratio_plane_stell_radiu'] = plane_radiu[0] / (
                 stell_radiu * 109.076)
@@ -752,7 +790,7 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_perio'] = moon_perio[0][0]
                 curre_curve[-1, 1]['moon_radiu'] = moon_radiu[0][0]
                 curre_curve[-1, 1]['moon_mass'] = moon_mass[0][0]
-                curre_curve[-1, 1]['moon_numbe'] = moon_numbe
+                curre_curve[-1, 1]['moon_numbe'] = moon_numbe[0]
                 curre_curve[-1, 1]['ratio_moon_plane_radiu'] = moon_radiu[0][
                     0] / plane_radiu[0]
                 curre_curve[-1,
@@ -1448,103 +1486,95 @@ def show_featu_preci_recal(data,
                            cutof,
                            featu=None,
                            bins=20,
+                           equal_width_bins=True,
+                           stand_axis=True,
                            trans_type='plane_moon_cut_injec',
                            save_figur_path='',
-                           width=16,
-                           heigh=5):
+                           figur_chara={'figsize': [15, 5]},
+                           title_chara={'size': 16},
+                           x_chara={'size': 14},
+                           y_left_chara={
+                               'c': 'blue',
+                               'size': 14
+                           },
+                           y_right_chara={
+                               'c': 'green',
+                               'size': 14
+                           },
+                           legen_left_chara={'loc': 'upper left'},
+                           legen_right_chara={'loc': 'upper right'}):
     '''Show precision and recall as a function of a numerical feature.'''
     # Plot standard precision and recall curve
     if featu is None or featu == 'predi' or data is None:
         show_preci_recal(predi, y_data, cutof, save_figur_path, width, heigh)
+    # Plot precision and recall as a function of a numerical feature
     else:
-        binn_data = bin_data(data, featu, bins)
+        binne_data = bin_data(data, featu, bins, equal_width_bins)
         preci = []
         recal = []
-        for i in range(len(bin_data)):
+        previ_infor_lengt = 0
+        for i in range(len(binne_data)):
             tp = 0
             fp = 0
             fn = 0
-            for ii in range(len(binn_data[i])):
+            for ii in range(len(binne_data[i])):
                 # Keep track of true positives, false positives, and false negatives
-                tp += x_full_predi_data[binn_data[i][ii][0].astype(int), -1,
-                                        1][trans_type] and predi[
-                                            i * len(binn_data[0]) + ii] > cutof
-                fp += not x_full_predi_data[
-                    binn_data[i][ii][0].astype(int), -1,
-                    1][trans_type] and predi[i * len(binn_data[0]) +
-                                             ii] > cutof
-                fn += x_full_predi_data[binn_data[i][ii][0].astype(int), -1,
-                                        1][trans_type] and not predi[
-                                            i * len(binn_data[0]) + ii] > cutof
+                tp += data[binne_data[i][ii][0].astype(int), -1,
+                           1][trans_type] and predi[previ_infor_lengt +
+                                                    ii] > cutof
+                fp += not data[binne_data[i][ii][0].astype(int), -1,
+                               1][trans_type] and predi[previ_infor_lengt +
+                                                        ii] > cutof
+                fn += data[binne_data[i][ii][0].astype(int), -1,
+                           1][trans_type] and not predi[previ_infor_lengt +
+                                                        ii] > cutof
             # If divide by 0, ignore
             try:
                 if tp or fp:
                     # Calculate precision
-                    preci.append([
-                        bin_data[i][len(bin_data[i]) // 2][1], tp / (tp + fp)
-                    ])
-                else:
-                    # If the denominator is zero, set the precision to 0
-                    preci.append([bin_data[i][len(bin_data[i]) // 2][1], 0])
+                    preci.append(
+                        [np.mean(binne_data[i][:, 1]), tp / (tp + fp)])
             except:
                 pass
             try:
                 if tp or fn:
                     # Calculate the recall
-                    recal.append([
-                        bin_data[i][len(bin_data[i]) // 2][1], tp / (tp + fn)
-                    ])
-                else:
-                    # If the denominator is zero, set the recall to 0
-                    recal.append([bin_data[i][len(bin_data[i]) // 2][1], 0])
+                    recal.append(
+                        [np.mean(binne_data[i][:, 1]), tp / (tp + fn)])
             except:
                 pass
+            # Keep track of the amount of previously binned data
+            previ_infor_lengt += len(binne_data[i])
+            
         # Convert precision and recall from lists to numpy arrays
         preci = np.array(preci)
         recal = np.array(recal)
-
         # Create a plot
-        figur, axes1 = plt.subplots(1, 1, figsize=(width, heigh))
+        figur, axes1 = plt.subplots(1, 1, **figur_chara)
         axes2 = axes1.twinx()
 
-        # Calculate the area under each curve
-        preci_area_under_curve = calcu_area_under_curve(preci)
-        recal_area_under_curve = calcu_area_under_curve(recal)
+        axes1.plot(preci[:, 0], preci[:, 1], c=y_left_chara['c'])
+        axes2.plot(recal[:, 0], recal[:, 1], c=y_right_chara['c'])
 
-        axes1.plot(preci[:, 0],
-                   preci[:, 1],
-                   label=f'AUC {preci_area_under_curve:.4}',
-                   c='blue')
-        axes2.plot(recal[:, 0],
-                   recal[:, 1],
-                   label=f'AUC {recal_area_under_curve:.4}',
-                   c='green')
-        # Font characteristics
-        title_axis = {'size': '16', 'c': 'black', 'weight': 'normal'}
-        botto_axis = {'size': '14', 'c': 'black', 'weight': 'normal'}
-        left_axis = {'size': '14', 'c': 'blue'}
-        right_axis = {
-            'size': '14',
-            'c': 'green',
-            'rotation': -90,
-            'labelpad': 15
-        }
+        # Standardize the axis values from 0 to 1
+        if stand_axis:
+            axes1.set_ylim([0, 1])
+            axes2.set_ylim([0, 1])
 
         # Set labels
-        axes1.set_ylabel('Precision', **left_axis)
-        axes2.set_ylabel('Recall', **right_axis)
-        axes1.legend(loc='upper left')
-        axes2.legend(loc='upper right')
-        axes1.set_xlabel(f'{data[0, -1, 1]["forma_names"][featu]}',
-                         **botto_axis)
+        axes1.set_ylabel('Precision', **y_left_chara)
+        axes2.set_ylabel('Recall', **y_right_chara)
+        #         axes1.legend(**legen_left_chara)
+        #         axes2.legend(**legen_right_chara)
+        axes1.set_xlabel(f'{data[0, -1, 1]["forma_names"][featu]}', **x_chara)
         # Remove units from title
         axes1.set_title(
             f'Precision and Recall as a Function of {data[0, -1, 1]["forma_names"][featu].split(" [")[0]}',
-            **title_axis)
+            **title_chara)
 
         figur.tight_layout()
         if save_figur_path:
-            plt.savefig(f'{save_figur_path}pr_curve-{float(time.time())}.pdf')
+            plt.savefig(f'{save_figur_path}pr_curve-{int(time.time())}.pdf')
         figur.show()
 
         
@@ -1554,3 +1584,20 @@ def retur_most_recen(folde_path):
         folde_path = f'{folde_path}/'
     files_in_folde = glob.glob(f'{folde_path}*')
     return max(files_in_folde, key=os.path.getctime).split('/')[-1]
+
+
+def secon_to_hours_minut_secon(secon):
+    '''Converts seconds to hours, minutes, and seconds.'''
+    hours = int(secon // 3600)
+    minut = int((secon - 3600 * hours) // 60)
+    secon = int((secon - 3600 * hours - 60 * minut) // 1)
+    return f'{hours:02}:{minut:02}:{secon:02}'
+        
+
+def remov_TOI(data):
+    '''Removes TOIs from the dataset.'''
+    toi_index = []
+    for i in range(len(data)):
+        if data[i, -1, 1]['toi']:
+            toi_index.append(i)
+    return np.delete(data, toi_index, axis=0)
