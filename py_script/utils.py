@@ -135,7 +135,10 @@ def retur_fits_data(curve_names, featu, path):
     return curves
 
 
-def creat_confu_matri(data, predi, cutof=0.5, detec_type='plane_moon_cut_injec'):
+def creat_confu_matri(data,
+                      predi,
+                      cutof=0.5,
+                      detec_type='plane_moon_cut_injec'):
     '''Returns a list of numpy arrays containing true positives, \
 true negatives, false positives, and false negatives.'''
     # Turn predictions into binary predictions based on the cutoff
@@ -153,12 +156,12 @@ true negatives, false positives, and false negatives.'''
     # Create the confusion matrix lists
     for i in range(len(data)):
         if true_false[i]:
-            if data[i, -1, 1][detec_type]:  
+            if data[i, -1, 1][detec_type]:
                 true_posit.append(i)
             else:
                 true_negat.append(i)
         else:
-            if data[i, -1, 1][detec_type]:  
+            if data[i, -1, 1][detec_type]:
                 false_negat.append(i)
             else:
                 false_posit.append(i)
@@ -196,7 +199,8 @@ def show_confu_matri(data,
             plt.subplot(numbe_rows, numbe_colum, i + 1)
             # Mark TP, TN, FP, FN
             marke_data = creat_confu_matri(
-                data[binne_data[i][:, 0].astype(int)], predi, cutof, detec_type)
+                data[binne_data[i][:, 0].astype(int)], predi, cutof,
+                detec_type)
             confu_matrix = np.array([[len(marke_data[1]),
                                       len(marke_data[2])],
                                      [len(marke_data[3]),
@@ -227,11 +231,15 @@ def show_confu_matri(data,
     plt.show()
 
 
-def bin_data(data, featu, bins=1, equal_width_bins=True, ignor_strin_none=True):
+def bin_data(data,
+             featu,
+             bins=1,
+             equal_width_bins=True,
+             ignor_strin_none=True):
     '''Returns a list of numpy arrays containing the index \
 and value of binned ascending numerical data or based on their string feature.'''
-    
-    # Bin the data based on the spread of the feature, not the 
+
+    # Bin the data based on the spread of the feature, not the
     # occurence rate of a feature
     if equal_width_bins:
         unord_data = []
@@ -266,8 +274,8 @@ and value of binned ascending numerical data or based on their string feature.''
         # Add the last bin
         binne_data.append(order_infor[start_index:])
         # Return binned data, list of arrays in index, feature format
-        return binne_data      
-    
+        return binne_data
+
     # Bin the data based on the occurence rate of a feature
     binne_data = []
     strin_featu = []
@@ -363,18 +371,18 @@ TPR and FPR in two plots or overlayed in one.'''
     # Binary prediction
     binar_predi = predi > cutof
     for i in range(len(data)):
-        curre_featu = data[i, -1, 1][detec_type]  
+        curre_featu = data[i, -1, 1][detec_type]
         if not isinstance(curre_featu,
                           (int, float)) and curre_featu is not None:
             raise TypeError(f'')
-        if data[i, -1, 1][detec_type] == binar_predi[i]:  
+        if data[i, -1, 1][detec_type] == binar_predi[i]:
             if curre_featu:
                 if data[i, -1, 1][featu] is not None:
                     infor.append([data[i, -1, 1][featu], True, False, False])
             else:
                 if data[i, -1, 1][featu] is not None:
                     infor.append([data[i, -1, 1][featu], False, True, False])
-        elif not data[i, -1, 1][detec_type] and binar_predi[i]: 
+        elif not data[i, -1, 1][detec_type] and binar_predi[i]:
             if data[i, -1, 1][featu] is not None:
                 infor.append([data[i, -1, 1][featu], False, False, True])
     infor = np.array(infor)
@@ -513,11 +521,13 @@ def injec_curve(curve,
     if not reinj:
         if plane_max_numbe < 1:
             raise ValueError(f"The maximum number of planets must be \
-    greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively.")
+    greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively."
+                             )
         elif type_orbit_archi == 'planmoon' and moon_max_numbe < 1:
             raise ValueError(f"The maximum number of moons must be \
-    greater than 1 for a planet moon injection. Currently, it's {moon_max_numbe}.")
-        
+    greater than 1 for a planet moon injection. Currently, it's {moon_max_numbe}."
+                             )
+
     # Increase the number of dimensions if only a single curve is provided
     if len(curve.shape) == 2:
         curve = [curve]
@@ -529,14 +539,18 @@ def injec_curve(curve,
 curre_curve[-1, 1]['stell_mass'] is None or curre_curve[-1, 1]['toi'] or \
 curre_curve[-1, 1]['eb']:
             continue
-            
+
         if curre_curve[-1, 1]['curve_type'] != 'Light Curve' and not reinj:
-            warnings.warn("Trying to inject an injected curve. Do you mean to turn 'reinj' on? ", RuntimeWarning)
+            warnings.warn(
+                "Trying to inject an injected curve. Do you mean to turn 'reinj' on? ",
+                RuntimeWarning)
             continue
         if curre_curve[-1, 1]['curve_type'] == 'Light Curve' and reinj:
-            warnings.warn("Trying to reinject a uninjected curve. Do you mean to turn 'reinj' off? ", RuntimeWarning)
+            warnings.warn(
+                "Trying to reinject a uninjected curve. Do you mean to turn 'reinj' off? ",
+                RuntimeWarning)
             continue
-            
+
         time_axis = curre_curve[find_start(curre_curve):-1, 0].astype(float)
         time_min = np.amin(time_axis)
         time_max = np.amax(time_axis)
@@ -556,7 +570,8 @@ curre_curve[-1, 1]['eb']:
                 plane_epoch = [curre_curve[-1, 1]['plane_epoch']]
                 plane_radiu = [curre_curve[-1, 1]['plane_radiu']]
                 plane_mass = [curre_curve[-1, 1]['plane_mass']]
-                plane_incli_degre = np.array([curre_curve[-1, 1]['plane_incli']])
+                plane_incli_degre = np.array(
+                    [curre_curve[-1, 1]['plane_incli']])
                 plane_eccen = curre_curve[-1, 1]['plane_eccen']
                 plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
             else:
@@ -564,10 +579,10 @@ curre_curve[-1, 1]['eb']:
                 plane_epoch = curre_curve[-1, 1]['plane_epoch']
                 plane_incli_degre = curre_curve[-1, 1]['plane_incli']
                 plane_radiu = curre_curve[-1, 1]['plane_radiu']
-                plane_mass = curre_curve[-1, 1]['plane_mass'] 
+                plane_mass = curre_curve[-1, 1]['plane_mass']
                 plane_eccen = curre_curve[-1, 1]['plane_eccen']
                 plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
-            
+
             moon_numbe = curre_curve[-1, 1]['moon_numbe']
             if moon_numbe == 1:
                 moon_perio = [np.array([curre_curve[-1, 1]['moon_perio']])]
@@ -576,7 +591,8 @@ curre_curve[-1, 1]['eb']:
                 moon_mass = [[curre_curve[-1, 1]['moon_mass']]]
                 moon_eccen = curre_curve[-1, 1]['moon_eccen']
                 moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
-                moon_incli_radia = curre_curve[-1, 1]['moon_incli'] * np.pi / 180
+                moon_incli_radia = curre_curve[-1,
+                                               1]['moon_incli'] * np.pi / 180
                 moon_numbe = np.array([moon_numbe])
             else:
                 moon_perio = curre_curve[-1, 1]['moon_perio']
@@ -586,15 +602,18 @@ curre_curve[-1, 1]['eb']:
                 moon_eccen = curre_curve[-1, 1]['moon_eccen']
                 moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
                 moon_incli_radia = None
-                if curre_curve[-1, 1]['moon_incli'] is not None: 
-                    moon_incli_radia = curre_curve[-1, 1]['moon_incli'] * np.pi / 180
-                    
+                if curre_curve[-1, 1]['moon_incli'] is not None:
+                    moon_incli_radia = curre_curve[
+                        -1, 1]['moon_incli'] * np.pi / 180
+
             plane_type = curre_curve[-1, 1]['plane_type']
             type_limb_darke = curre_curve[-1, 1]['type_limb_darke']
-            linea_limb_darke_coeff = curre_curve[-1, 1]['linea_limb_darke_coeff']
+            linea_limb_darke_coeff = curre_curve[-1,
+                                                 1]['linea_limb_darke_coeff']
             trape_trans = curre_curve[-1, 1]['trape_trans']
-            quadr_limb_darke_coeff = curre_curve[-1, 1]['quadr_limb_darke_coeff']
-            
+            quadr_limb_darke_coeff = curre_curve[-1,
+                                                 1]['quadr_limb_darke_coeff']
+
         else:
             # Planets
             plane_numbe = np.random.randint(1, plane_max_numbe + 1)
@@ -651,19 +670,19 @@ curre_curve[-1, 1]['eb']:
                     moon_smax[i] = np.empty(moon_numbe[i])
                     moon_radiu[i] = tdpy.icdf_powr(
                         np.random.rand(moon_numbe[i]), 0.1, 0.6,
-                        2.) * plane_radiu[i]  
+                        2.) * plane_radiu[i]
                     moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
                     moon_densi[i] = moon_mass[i] / moon_radiu[i]**3
-                    moon_min_smax = ephesus.retr_radiroch(plane_radiu[i],
-                                                          plane_densi[i],
-                                                          moon_densi[i])
+                    moon_min_smax = ephesus.retr_radiroch(
+                        plane_radiu[i], plane_densi[i], moon_densi[i])
                     for ii in moon_index[i]:
-                        moon_smax[i][ii] = tdpy.icdf_powr(np.random.rand(),
-                                                          moon_min_smax[ii],
-                                                          moon_max_smax[i], 2.)
-                    moon_perio[i] = ephesus.retr_perikepl(moon_smax[i], total_mass)
-                    moon_epoch[i] = tdpy.icdf_self(np.random.rand(moon_numbe[i]),
-                                                   time_min, time_max)
+                        moon_smax[i][ii] = tdpy.icdf_powr(
+                            np.random.rand(), moon_min_smax[ii],
+                            moon_max_smax[i], 2.)
+                    moon_perio[i] = ephesus.retr_perikepl(
+                        moon_smax[i], total_mass)
+                    moon_epoch[i] = tdpy.icdf_self(
+                        np.random.rand(moon_numbe[i]), time_min, time_max)
                 # Check to make sure realistic semi-major axis length
                 if (moon_smax[i] > plane_smax[i] / 1.2).any():
                     continue
@@ -688,7 +707,7 @@ curre_curve[-1, 1]['eb']:
         anima_name = ''
         if anima_path is not None:
             anima_name = f'{curre_curve[-1, 1]["tic_id"]}-{float(time.time())}'
-        
+
         # Generate signal
         relat_flux_dicti = ephesus.retr_rflxtranmodl(
             time_axis,
@@ -713,10 +732,9 @@ curre_curve[-1, 1]['eb']:
             coeflmdkquad=quadr_limb_darke_coeff,
             pathanim=anima_path,
             strgextn=anima_name,
-            boolcompmoon=separ_plane_moon
-        )
-        
-        relat_flux = relat_flux_dicti['rflx']        
+            boolcompmoon=separ_plane_moon)
+
+        relat_flux = relat_flux_dicti['rflx']
 
         # Remove possible first value edge case
         if relat_flux[0] != 1 and relat_flux[1] == 1:
@@ -800,8 +818,10 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
                 if separ_plane_moon:
-                    curre_curve[-1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
-                    curre_curve[-1, 1]['moon_signa'] = relat_flux_dicti['rflxmoon']
+                    curre_curve[
+                        -1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
+                    curre_curve[-1,
+                                1]['moon_signa'] = relat_flux_dicti['rflxmoon']
             else:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch
                 curre_curve[-1, 1]['moon_perio'] = moon_perio
@@ -1176,7 +1196,7 @@ highlight injection times.'''
         raise ValueError(
             f'Start stop index must be in [start, stop] or [TIC ID] format. \
 Currently: {start_stop_tic_id}.')
-    # Increase the height of the figure based on 
+    # Increase the height of the figure based on
     # the number of curves if the figure size is
     # specified
     try:
@@ -1258,13 +1278,14 @@ data[i, -1, 1]['cut_times'] is not None:
     figur.show()
 
 
-def log_predi_infor(data,
-                    predi,
-                    path,
-                    model_name,
-                    datas_name,
-                    first_colum=['predi', 'plane_moon_cut_injec', 'plane_cut_injec'],
-                    ignor_featu=['signa', 'forma_names']):
+def log_predi_infor(
+        data,
+        predi,
+        path,
+        model_name,
+        datas_name,
+        first_colum=['predi', 'plane_moon_cut_injec', 'plane_cut_injec'],
+        ignor_featu=['signa', 'forma_names']):
     '''Logs prediction data and features to given path.'''
     # Create list of desired features
     featu = ['predi']
@@ -1288,6 +1309,7 @@ def log_predi_infor(data,
     # Create metadata
     infor = f'"model_file":{model_name}, "accur":{accur}, "train_for":"Exomoons", \
 "train_on":{datas_name}, "notes":"Accuracy is calculated with a cutoff of 0.5"'
+
     metad = np.full(len(featu), np.NaN).astype(object)
     metad[0] = 1
 
@@ -1295,10 +1317,12 @@ def log_predi_infor(data,
     log_infor.loc[-1] = metad
     log_infor.sort_values(by=['predi'], ascending=False, inplace=True)
     # Put first_colum in front
-    log_infor = log_infor[first_colum + [colum for colum in log_infor if colum not in first_colum]]
+    log_infor = log_infor[
+        first_colum +
+        [colum for colum in log_infor if colum not in first_colum]]
     # Insert metadata information
     log_infor.iloc[0, 0] = infor
-    
+
     # Log csv to path
     log_infor.to_csv(f'{path}{datas_name}_{model_name}_{time.time()}.csv')
 
@@ -1328,16 +1352,14 @@ a desired status.'''
             elif not data[i, -1, 1][detec_type] and binar_predi[i]:
                 fp.append(i)
         elif statu == 'negat':
-            if not data[i, -1,
-                        1][detec_type] and not binar_predi[i]:
+            if not data[i, -1, 1][detec_type] and not binar_predi[i]:
                 tn.append(i)
             elif data[i, -1, 1][detec_type] and not binar_predi[i]:
                 fn.append(i)
         elif statu == 'true':
             if data[i, -1, 1][detec_type] and binar_predi[i]:
                 tp.append(i)
-            elif not data[i, -1,
-                          1][detec_type] and not binar_predi[i]:
+            elif not data[i, -1, 1][detec_type] and not binar_predi[i]:
                 tn.append(i)
         elif statu == 'false':
             if not data[i, -1, 1][detec_type] and binar_predi[i]:
@@ -1463,7 +1485,7 @@ a desired status.'''
 
     figur.tight_layout()
     if save_figur_path:
-        figur.savefig(f'{save_figur_path}predi_compa-{float(time.time())}.pdf')
+        figur.savefig(f'{save_figur_path}predi_compa-{int(time.time())}.pdf')
     figur.show()
 
 
@@ -1493,16 +1515,11 @@ def show_featu_preci_recal(data,
                            figur_chara={'figsize': [15, 5]},
                            title_chara={'size': 16},
                            x_chara={'size': 14},
-                           y_left_chara={
-                               'c': 'blue',
-                               'size': 14
-                           },
-                           y_right_chara={
-                               'c': 'green',
-                               'size': 14
-                           },
-                           legen_left_chara={'loc': 'upper left'},
-                           legen_right_chara={'loc': 'upper right'}):
+                           y_left_chara={'c': 'blue','size': 14},
+                           y_left_uncer_chara={'color': 'blue', 'alpha': 0.2},
+                           y_right_chara={'c': 'green','size': 14},
+                           y_right_uncer_chara={'color': 'green', 'alpha': 0.2},
+                           legen={'loc': 'upper left'}):
     '''Show precision and recall as a function of a numerical feature.'''
     # Plot standard precision and recall curve
     if featu is None or featu == 'predi' or data is None:
@@ -1510,8 +1527,12 @@ def show_featu_preci_recal(data,
     # Plot precision and recall as a function of a numerical feature
     else:
         binne_data = bin_data(data, featu, bins, equal_width_bins)
+        binne_data_len = 0 
+        for i in range(len(binne_data)):
+            binne_data_len += len(binne_data[i])
         preci = []
         recal = []
+        basel = []
         previ_infor_lengt = 0
         for i in range(len(binne_data)):
             tp = 0
@@ -1533,14 +1554,16 @@ def show_featu_preci_recal(data,
                 if tp or fp:
                     # Calculate precision
                     preci.append(
-                        [np.mean(binne_data[i][:, 1]), tp / (tp + fp)])
+                        [np.mean(binne_data[i][:, 1]), tp / (tp + fp), 1 / (tp + fp)**(0.5)])
             except:
                 pass
             try:
                 if tp or fn:
                     # Calculate the recall
                     recal.append(
-                        [np.mean(binne_data[i][:, 1]), tp / (tp + fn)])
+                        [np.mean(binne_data[i][:, 1]), tp / (tp + fn), 1 / (tp + fn)**(0.5)])
+                    basel.append(
+                        [np.mean(binne_data[i][:, 1]), (tp + fn) / ((len(binne_data[i]) / binne_data_len) * len(data))])
             except:
                 pass
             # Keep track of the amount of previously binned data
@@ -1549,12 +1572,18 @@ def show_featu_preci_recal(data,
         # Convert precision and recall from lists to numpy arrays
         preci = np.array(preci)
         recal = np.array(recal)
+        basel = np.array(basel)
+        print(basel)
+#         print(preci, recal)
         # Create a plot
         figur, axes1 = plt.subplots(1, 1, **figur_chara)
         axes2 = axes1.twinx()
 
         axes1.plot(preci[:, 0], preci[:, 1], c=y_left_chara['c'])
+        axes1.fill_between(preci[:, 0], preci[:, 1] + preci[:, 2], preci[:, 1] - preci[:, 2], **y_left_uncer_chara)
         axes2.plot(recal[:, 0], recal[:, 1], c=y_right_chara['c'])
+        axes1.fill_between(recal[:, 0], recal[:, 1] + recal[:, 2], recal[:, 1] - recal[:, 2], **y_right_uncer_chara)
+        axes1.plot(basel[:, 0], basel[:, 1], c='black', ls='--', label='Baseline')
 
         # Standardize the axis values from 0 to 1
         if stand_axis:
@@ -1564,7 +1593,8 @@ def show_featu_preci_recal(data,
         # Set labels
         axes1.set_ylabel('Precision', **y_left_chara)
         axes2.set_ylabel('Recall', **y_right_chara)
-        #         axes1.legend(**legen_left_chara)
+        axes1.legend()
+        axes1.legend(**legen)
         #         axes2.legend(**legen_right_chara)
         axes1.set_xlabel(f'{data[0, -1, 1]["forma_names"][featu]}', **x_chara)
         # Remove units from title
@@ -1577,7 +1607,6 @@ def show_featu_preci_recal(data,
             plt.savefig(f'{save_figur_path}pr_curve-{int(time.time())}.pdf')
         figur.show()
 
-        
 def retur_most_recen(folde_path):
     '''Returns the name of the most recent file.'''
     if folde_path[-1] != '/':
@@ -1592,7 +1621,7 @@ def secon_to_hours_minut_secon(secon):
     minut = int((secon - 3600 * hours) // 60)
     secon = int((secon - 3600 * hours - 60 * minut) // 1)
     return f'{hours:02}:{minut:02}:{secon:02}'
-        
+
 
 def remov_TOI(data):
     '''Removes TOIs from the dataset.'''
