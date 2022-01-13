@@ -53,6 +53,8 @@ import warnings
 import ephesus
 import troia
 import tdpy
+import const
+forma_names = const.forma_names
 
 # Do NOT use latex for matplotlib plots
 rc('text', usetex=False)
@@ -60,7 +62,7 @@ rc('text', usetex=False)
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 
-def retur_secto_files(secto_range, path, remov_dupli=True):
+def retur_secto_files(path, secto_range=[1,27], remov_dupli=False):
     '''Returns the file names for sectors of fits data'''
     file_names = []
     # Loops through directories to find fits files
@@ -179,14 +181,14 @@ def show_confu_matri(data,
                      featu=None,
                      bins=1,
                      detec_type='plane_moon_cut_injec',
-                     ignore_string_none=True,
+                     ignor_strin_none=True,
                      save_figur_path='',
                      width=6,
                      heigh=5,
                      font_size=1.3):
     '''Shows a confusion matrix for the given data and predictions.'''
     if featu is not None and bins > 1:
-        binne_data = bin_data(data, featu, bins, ignore_string_none)
+        binne_data = bin_data(data, featu, bins, ignor_strin_none)
         # Set the number of rows and columns for the graphic
         numbe_colum = 3
         if len(binne_data) == 2:
@@ -207,7 +209,7 @@ def show_confu_matri(data,
                                       len(marke_data[0])]])
             sns.heatmap(confu_matrix, annot=True, fmt='g')
             plt.title(
-                f'{data[i, -1, 1]["forma_names"][featu]}: {binne_data[i][0, 1]}-{binne_data[i][-1, 1]}'
+                f'{forma_names[featu]}: {binne_data[i][0, 1]}-{binne_data[i][-1, 1]}'
             )
             plt.xlabel('Predictions')
             plt.ylabel('Actual')
@@ -249,7 +251,8 @@ and value of binned ascending numerical data or based on their string feature.''
                 unord_data.append([i, data[i, -1, 1][featu]])
         # Raise error if no data is returned
         if not len(unord_data):
-            raise RuntimeError(f'No numerical binnable data provided.')
+            raise RuntimeError(f'No quantitative data provided. If trying to \
+bin based on a qualitative feature, you must set equal_width_bins to false.')
 
         # Convert the unordered data to an array
         unord_data = np.array(unord_data)
@@ -427,7 +430,7 @@ TPR and FPR in two plots or overlayed in one.'''
         plt.figure(figsize=(width, heigh * 2))
         plt.subplot(2, 1, 1)
         plt.plot(bound, pr[:, 0], linewidth=1.8, c='navy')
-        plt.xlabel(f'{data[0, -1, 1]["forma_names"][featu]}', fontsize=14)
+        plt.xlabel(f'{forma_names[featu]}', fontsize=14)
         plt.ylabel('True Positive Rate', fontsize=14)
 
         plt.subplot(2, 1, 2)
@@ -436,7 +439,7 @@ TPR and FPR in two plots or overlayed in one.'''
                  linewidth=1.8,
                  c='red',
                  label='False Positive Rate')
-        plt.xlabel(f'{data[0, -1, 1]["forma_names"][featu]}', fontsize=14)
+        plt.xlabel(f'{forma_names[featu]}', fontsize=14)
         plt.ylabel('False Positive Rate', fontsize=14)
 
     plt.tight_layout()
@@ -574,6 +577,8 @@ curre_curve[-1, 1]['eb']:
                     [curre_curve[-1, 1]['plane_incli']])
                 plane_eccen = curre_curve[-1, 1]['plane_eccen']
                 plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
+                plane_densi = [curre_curve[-1, 1]['plane_densi']] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3))) 
+                # conversion from g/cm^3 to earth mass/radiu)
             else:
                 plane_perio = curre_curve[-1, 1]['plane_perio']
                 plane_epoch = curre_curve[-1, 1]['plane_epoch']
@@ -582,6 +587,7 @@ curre_curve[-1, 1]['eb']:
                 plane_mass = curre_curve[-1, 1]['plane_mass']
                 plane_eccen = curre_curve[-1, 1]['plane_eccen']
                 plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
+                plane_densi = curre_curve[-1, 1]['plane_densi'] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))
 
             moon_numbe = curre_curve[-1, 1]['moon_numbe']
             if moon_numbe == 1:
@@ -594,6 +600,8 @@ curre_curve[-1, 1]['eb']:
                 moon_incli_radia = curre_curve[-1,
                                                1]['moon_incli'] * np.pi / 180
                 moon_numbe = np.array([moon_numbe])
+                moon_densi = [np.array([curre_curve[-1, 1]['plane_densi']]) * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))]
+                                                                       
             else:
                 moon_perio = curre_curve[-1, 1]['moon_perio']
                 moon_epoch = curre_curve[-1, 1]['moon_epoch']
@@ -605,6 +613,7 @@ curre_curve[-1, 1]['eb']:
                 if curre_curve[-1, 1]['moon_incli'] is not None:
                     moon_incli_radia = curre_curve[
                         -1, 1]['moon_incli'] * np.pi / 180
+                moon_densi = curre_curve[-1, 1]['plane_densi'] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))
 
             plane_type = curre_curve[-1, 1]['plane_type']
             type_limb_darke = curre_curve[-1, 1]['type_limb_darke']
@@ -624,8 +633,8 @@ curre_curve[-1, 1]['eb']:
             plane_incli_degre = np.empty(plane_numbe)
             # Assign planet feature values
             for i in plane_index:
-                plane_perio[i] = np.random.random() * 5 + 2
-                plane_incli_radia[i] = np.random.random() * 0.04
+                plane_perio[i] = np.random.random() * 4 + 2
+                plane_incli_radia[i] = np.random.random() * 0.03
                 plane_incli_degre[i] = 180. / np.pi * np.arccos(
                     plane_incli_radia[i])
             plane_epoch = tdpy.icdf_self(np.random.rand(plane_numbe), time_min,
@@ -634,10 +643,13 @@ curre_curve[-1, 1]['eb']:
             plane_sin_w = 0
             if type_orbit_archi == 'planmoon' or type_orbit_archi == 'plan':
                 plane_radiu = np.empty(plane_numbe)
+                ###
                 for i in plane_index:
-                    plane_radiu[i] = 10 * np.random.random() + 1
+                    plane_radiu[i] = tdpy.icdf_powr(np.random.rand(1), 1, 12, 1.8)[0]
+#                     plane_radiu[i] = 10 * np.random.random() + 1
+                ###
                 plane_mass = ephesus.retr_massfromradi(plane_radiu)
-                plane_densi = plane_mass / plane_radiu**3
+                plane_densi = plane_mass / (4/3 * np.pi * plane_radiu**3)
 
             # Approximate total mass of the system
             total_mass = stell_mass
@@ -669,10 +681,9 @@ curre_curve[-1, 1]['eb']:
                     moon_index[i] = np.arange(moon_numbe[i])
                     moon_smax[i] = np.empty(moon_numbe[i])
                     moon_radiu[i] = tdpy.icdf_powr(
-                        np.random.rand(moon_numbe[i]), 0.1, 0.6,
-                        2.) * plane_radiu[i]
+                        np.random.rand(moon_numbe[i]), 0.1, 0.6, 1.8) * plane_radiu[i]
                     moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
-                    moon_densi[i] = moon_mass[i] / moon_radiu[i]**3
+                    moon_densi[i] = moon_mass[i] / (4/3 * np.pi * moon_radiu[i]**3)
                     moon_min_smax = ephesus.retr_radiroch(
                         plane_radiu[i], plane_densi[i], moon_densi[i])
                     for ii in moon_index[i]:
@@ -692,7 +703,7 @@ curre_curve[-1, 1]['eb']:
                 moon_incli_radia = 0
             else:
                 moon_perio = moon_epoch = moon_mass = moon_radiu \
-= moon_incli_radia = moon_eccen = moon_sin_w = None
+= moon_incli_radia = moon_eccen = moon_sin_w = moon_densi = None
                 moon_numbe = 0
                 rsma = ephesus.retr_rsma(plane_radiu, stell_radiu, plane_smax)
 
@@ -706,7 +717,7 @@ curre_curve[-1, 1]['eb']:
         # Create animation
         anima_name = ''
         if anima_path is not None:
-            anima_name = f'{curre_curve[-1, 1]["tic_id"]}-{float(time.time())}'
+            anima_name = f'{curre_curve[-1, 1]["tic_id"]}-{int(time.time())}'
 
         # Generate signal
         relat_flux_dicti = ephesus.retr_rflxtranmodl(
@@ -757,7 +768,11 @@ curre_curve[-1, 1]['eb']:
 
         # Add signal to curve
         curre_curve[find_start(curre_curve):-1, 1] += relat_flux - 1
-
+        plane_densi *= 5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)) # conversion from earth mass/radius to g/cm^3
+        if moon_densi is not None:
+            for ii in range(len(moon_densi)):
+                moon_densi[ii] *= 5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3))
+            
         # Add characteristics to each curve's dictionary
         curre_curve[-1, 1]['max_ampli'] = (min(relat_flux) - 1) * -1000
         curre_curve[-1, 1]['plane_numbe'] = plane_numbe
@@ -781,6 +796,7 @@ curre_curve[-1, 1]['eb']:
             curre_curve[-1, 1]['plane_incli'] = plane_incli_degre
             curre_curve[-1, 1]['plane_eccen'] = plane_eccen
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
+            curre_curve[-1, 1]['plane_densi'] = plane_densi
             curre_curve[-1, 1]['moon_epoch'] = moon_epoch
             curre_curve[-1, 1]['moon_perio'] = moon_perio
             curre_curve[-1, 1]['moon_radiu'] = moon_radiu
@@ -788,6 +804,7 @@ curre_curve[-1, 1]['eb']:
             curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
             curre_curve[-1, 1]['moon_eccen'] = moon_eccen
             curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
+            curre_curve[-1, 1]['moon_densi'] = moon_densi
         # Single planet and moon systems
         elif plane_numbe:
             # Convert planet and moon numbers from lists/arrays to floats
@@ -802,6 +819,7 @@ curre_curve[-1, 1]['eb']:
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
             curre_curve[-1, 1]['plane_eccen'] = plane_eccen
             curre_curve[-1, 1]['plane_sin_w'] = plane_sin_w
+            curre_curve[-1, 1]['plane_densi'] = plane_densi[0]
 
             if moon_numbe:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch[0][0]
@@ -817,6 +835,7 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_incli'] = moon_incli_radia
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
+                curre_curve[-1, 1]['moon_densi'] = moon_densi[0][0]
                 if separ_plane_moon:
                     curre_curve[
                         -1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
@@ -831,7 +850,11 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_eccen'] = moon_eccen
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
                 curre_curve[-1, 1]['moon_numbe'] = moon_numbe
-    return curve
+    if len(curve) - 1:
+        return curve
+    # Return only the curve if one curve is provided
+    # Used for multiprocessing
+    return curve[0]
 
 
 def mark_TOI(curve, TOI_ID):
@@ -1128,33 +1151,32 @@ def retur_title(curve,
                 inclu_TIC_ID=True):
     '''Returns a title containing the features.'''
     infor = curve[-1, 1]
-    forma_name = infor['forma_names']
     title = ''
     numbe_featu = 0
     if uniqu_featu:
         title = f'{uniqu_featu}, '
         numbe_featu += 1
     if inclu_TIC_ID:
-        title = f'{title}{forma_name["tic_id"]}: {infor["tic_id"]},'
+        title = f'{title}{forma_names["tic_id"]}: {infor["tic_id"]},'
         numbe_featu += 1
     for curre_featu in featu:
         if isinstance(infor[curre_featu], (int, str, np.int64)):
             # Use else statement for cut_numbe because cut_numbe can be 0
             if ignor_zeros and curre_featu != 'cut_numbe':
                 if infor[curre_featu]:
-                    title = f'{title} {forma_name[curre_featu]}: {infor[curre_featu]},'
+                    title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
                     numbe_featu += numbe_featu
             else:
-                title = f'{title} {forma_name[curre_featu]}: {infor[curre_featu]},'
+                title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
                 numbe_featu += 1
         elif isinstance(infor[curre_featu], (float, np.float64)):
             if ignor_zeros:
                 if infor[curre_featu]:
                     # Round after 4 digits
-                    title = f'{title} {forma_name[curre_featu]}: {infor[curre_featu]:.4},'
+                    title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
                     numbe_featu += 1
             else:
-                title = f'{title} {forma_name[curre_featu]}: {infor[curre_featu]:.4},'
+                title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
                 numbe_featu += 1
         # Create a line break every 50 characters
         if not numbe_featu % 3:
@@ -1274,8 +1296,11 @@ data[i, -1, 1]['cut_times'] is not None:
 
     figur.tight_layout()
     if save_figur_path:
-        figur.savefig(f'{save_figur_path}curves-{float(time.time())}.pdf')
+        figur.savefig(f'{save_figur_path}curves-{int(time.time())}.pdf')
     figur.show()
+    
+    # Reset the figsizd because running the code can change the parameter
+    figur_chara['figsize'] = [15, 5]
 
 
 def log_predi_infor(
@@ -1285,7 +1310,7 @@ def log_predi_infor(
         model_name,
         datas_name,
         first_colum=['predi', 'plane_moon_cut_injec', 'plane_cut_injec'],
-        ignor_featu=['signa', 'forma_names']):
+        ignor_featu=['signa']):
     '''Logs prediction data and features to given path.'''
     # Create list of desired features
     featu = ['predi']
@@ -1520,7 +1545,7 @@ def show_featu_preci_recal(data,
                            y_right_chara={'c': 'green','size': 14},
                            y_right_uncer_chara={'color': 'green', 'alpha': 0.2},
                            legen={'loc': 'upper left'}):
-    '''Show precision and recall as a function of a numerical feature.'''
+    '''Show precision and recall as a function of a quantitative feature.'''
     # Plot standard precision and recall curve
     if featu is None or featu == 'predi' or data is None:
         show_preci_recal(predi, y_data, cutof, save_figur_path, width, heigh)
@@ -1532,7 +1557,6 @@ def show_featu_preci_recal(data,
             binne_data_len += len(binne_data[i])
         preci = []
         recal = []
-        basel = []
         previ_infor_lengt = 0
         for i in range(len(binne_data)):
             tp = 0
@@ -1562,8 +1586,6 @@ def show_featu_preci_recal(data,
                     # Calculate the recall
                     recal.append(
                         [np.mean(binne_data[i][:, 1]), tp / (tp + fn), 1 / (tp + fn)**(0.5)])
-                    basel.append(
-                        [np.mean(binne_data[i][:, 1]), (tp + fn) / ((len(binne_data[i]) / binne_data_len) * len(data))])
             except:
                 pass
             # Keep track of the amount of previously binned data
@@ -1572,9 +1594,8 @@ def show_featu_preci_recal(data,
         # Convert precision and recall from lists to numpy arrays
         preci = np.array(preci)
         recal = np.array(recal)
-        basel = np.array(basel)
-        print(basel)
-#         print(preci, recal)
+        # Create a random guess baseline
+        basel = np.array([[recal[0, 0], sum(y_data)/len(y_data)], [recal[-1, 0], sum(y_data)/len(y_data)]])
         # Create a plot
         figur, axes1 = plt.subplots(1, 1, **figur_chara)
         axes2 = axes1.twinx()
@@ -1595,11 +1616,10 @@ def show_featu_preci_recal(data,
         axes2.set_ylabel('Recall', **y_right_chara)
         axes1.legend()
         axes1.legend(**legen)
-        #         axes2.legend(**legen_right_chara)
-        axes1.set_xlabel(f'{data[0, -1, 1]["forma_names"][featu]}', **x_chara)
+        axes1.set_xlabel(f'{forma_names[featu]}', **x_chara)
         # Remove units from title
         axes1.set_title(
-            f'Precision and Recall as a Function of {data[0, -1, 1]["forma_names"][featu].split(" [")[0]}',
+            f'Precision and Recall as a Function of {forma_names[featu].split(" [")[0]}',
             **title_chara)
 
         figur.tight_layout()
