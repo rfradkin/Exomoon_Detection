@@ -1,3 +1,61 @@
+infor = {
+    'curve_injec': False, 
+    'curve_type': None,
+    'cut_times': None,
+    'cut_trans': None,
+    'cut_numbe': None,
+    'cut_start_index': None,
+    'detre_time_scale': None,
+    'detre_type': None,
+    'eb': None,
+    'file_name': None,
+    'injec_times': None,
+    'inter_type': None,
+    'initi_paddi': None,
+    'linea_limb_darke_coeff': None,
+    'max_ampli': None,
+    'model_file': None,
+    'moon_densi': None,
+    'moon_eccen': None,
+    'moon_epoch': None,
+    'moon_incli': None,
+    'moon_mass': None,
+    'moon_numbe': None,
+    'moon_perio': None,
+    'moon_radiu': None,
+    'moon_sin_w': None,
+    'moon_signa': None,
+    'plane_cut_injec': None,
+    'plane_densi': None,
+    'plane_eccen': None,
+    'plane_epoch': None,
+    'plane_incli': None,
+    'plane_mass': None,
+    'plane_moon_cut_injec': None,
+    'plane_numbe': None,
+    'plane_perio': None,
+    'plane_radiu': None,
+    'plane_sin_w': None,
+    'plane_signa': None,
+    'plane_type': None,
+    'predi': None,
+    'quadr_limb_darke_coeff': None,
+    'ratio_moon_plane_radiu': None,
+    'ratio_moon_stell_radiu': None,
+    'ratio_plane_stell_radiu': None,
+    'signa': None,
+    'stell_effec_tempe': None,
+    'stell_magni': None,
+    'stell_mass': None,
+    'stell_radiu': None,
+    'tic_id': None,
+    'toi': None,
+    'trape_trans': None,
+    'type_calcu': None,
+    'type_limb_darke': None,
+    'type_orbit_archi': None
+}
+
 forma_names = {
     'curve_injec': 'Curve Injected',
     'curve_type': 'Curve Type',
@@ -55,3 +113,9 @@ forma_names = {
     'type_limb_darke': 'Type of Limb Darkening',
     'type_orbit_archi': 'Type of Orbital Architecture'
 }
+
+
+main_path = '/home/rfradkin/xom/'
+raw_tess_path = '/scratch/data/tess/lcur/spoc/raws/'
+tess_metad_path = '/data/scratch/data/tess/meta/'
+xom_data_path = '/data/scratch/data/moon/'

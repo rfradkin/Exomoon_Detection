@@ -54,7 +54,12 @@ import ephesus
 import troia
 import tdpy
 import const
+infor = const.infor
 forma_names = const.forma_names
+main_path = const.main_path
+raw_tess_path = const.raw_tess_path
+tess_metad_path = const.tess_metad_path
+xom_data_path = const.xom_data_path
 
 # Do NOT use latex for matplotlib plots
 rc('text', usetex=False)
@@ -62,7 +67,7 @@ rc('text', usetex=False)
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 
-def retur_secto_files(path, secto_range=[1,27], remov_dupli=False):
+def retur_secto_files(path=f'{raw_tess_path}', secto_range=[1,27], remov_dupli=False):
     '''Returns the file names for sectors of fits data'''
     file_names = []
     # Loops through directories to find fits files
@@ -102,39 +107,29 @@ def find_TIC_secto(filen):
     return int(filen[hyphe[0] + 2:hyphe[1]])
 
 
-def retur_fits_data(curve_names, featu, path):
-    '''Import padded light curves from fits files.'''
-    file_list = []
-    for file in curve_names:
-        secto_numbe = str(find_TIC_secto(file))
-        if len(secto_numbe) != 2:
-            secto_numbe = f'0{secto_numbe}'
-        file_list.append(
-            ephesus.read_tesskplr_file(f'{path}sector-{secto_numbe}/{file}')[0]
-            [:, 0:2])
-
-    # Post pad light curves so no information is lost
-    curves = tf.keras.preprocessing.sequence.pad_sequences(file_list,
-                                                           padding='pre',
-                                                           dtype=float)
-
-    curves = curves.astype(object)
+def retur_fits_data(file, path=f'{raw_tess_path}', featu=infor):
+    '''Import a light curve from a fits file.'''
+    secto_numbe = str(find_TIC_secto(file))
+    if len(secto_numbe) != 2:
+        secto_numbe = f'0{secto_numbe}'
+    light_curve = ephesus.read_tesskplr_file(f'{path}sector-{secto_numbe}/{file}')[0][:, 0:2]
+    
+    light_curve = np.array(light_curve).astype(object)
     # Insert cell for dictionary containing features
-    curves = np.insert(curves,
-                       len(curves[0]),
+    light_curve = np.insert(light_curve,
+                       len(light_curve),
                        np.zeros((1, 2), dtype=object),
-                       axis=1)
-    curves[:, -1, 0] = 'infor'
+                       axis=0)
+    light_curve[-1, 0] = 'infor'
 
     # Populate basic features
     if len(featu) > 0:
-        for i in range(len(curves)):
-            curves[i, len(curves[0]) - 1, 1] = featu.copy()
-            curves[i, -1, 1]['file_name'] = curve_names[i]
-            curves[i, -1, 1]['tic_id'] = find_TIC_ID(curve_names[i])
-            curves[i, -1, 1]['curve_type'] = 'Light Curve'
-            curves[i, -1, 1]['initi_paddi'] = find_start(curves[i, :-1])
-    return curves
+        light_curve[-1, 1] = featu.copy()
+        light_curve[-1, 1]['file_name'] = file
+        light_curve[-1, 1]['tic_id'] = find_TIC_ID(file)
+        light_curve[-1, 1]['curve_type'] = 'Light Curve'
+        
+    return light_curve
 
 
 def creat_confu_matri(data,
@@ -513,22 +508,21 @@ def find_start(curve):
     return -1
 
 
-def injec_curve(curve,
+def injec_signa(curve,
                 plane_max_numbe=1,
                 moon_max_numbe=1,
                 type_orbit_archi='planmoon',
                 separ_plane_moon=False,
-                reinj=False,
                 anima_path=None):
     '''Returns an injected light curve with exoplanets and exomoons.'''
-    if not reinj:
-        if plane_max_numbe < 1:
-            raise ValueError(f"The maximum number of planets must be \
-    greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively."
-                             )
-        elif type_orbit_archi == 'planmoon' and moon_max_numbe < 1:
-            raise ValueError(f"The maximum number of moons must be \
-    greater than 1 for a planet moon injection. Currently, it's {moon_max_numbe}."
+    
+    if plane_max_numbe < 1:
+        raise ValueError(f"The maximum number of planets must be \
+greater than 1. Currently, it's {plane_max_numbe} and {moon_max_numbe} respectively."
+                         )
+    elif type_orbit_archi == 'planmoon' and moon_max_numbe < 1:
+        raise ValueError(f"The maximum number of moons must be \
+greater than 1 for a planet moon injection. Currently, it's {moon_max_numbe}."
                              )
 
     # Increase the number of dimensions if only a single curve is provided
@@ -543,17 +537,12 @@ curre_curve[-1, 1]['stell_mass'] is None or curre_curve[-1, 1]['toi'] or \
 curre_curve[-1, 1]['eb']:
             continue
 
-        if curre_curve[-1, 1]['curve_type'] != 'Light Curve' and not reinj:
+        if curre_curve[-1, 1]['curve_type'] != 'Light Curve':
             warnings.warn(
-                "Trying to inject an injected curve. Do you mean to turn 'reinj' on? ",
+                "Trying to inject an injected curve.",
                 RuntimeWarning)
             continue
-        if curre_curve[-1, 1]['curve_type'] == 'Light Curve' and reinj:
-            warnings.warn(
-                "Trying to reinject a uninjected curve. Do you mean to turn 'reinj' off? ",
-                RuntimeWarning)
-            continue
-
+            
         time_axis = curre_curve[find_start(curre_curve):-1, 0].astype(float)
         time_min = np.amin(time_axis)
         time_max = np.amax(time_axis)
@@ -565,154 +554,92 @@ curre_curve[-1, 1]['eb']:
         stell_radiu = curre_curve[-1, 1]['stell_radiu']
         stell_mass = curre_curve[-1, 1]['stell_mass']
 
-        if reinj:
-            # Copy values from previously injected curve
-            plane_numbe = curre_curve[-1, 1]['plane_numbe']
-            if plane_numbe == 1:
-                plane_perio = [curre_curve[-1, 1]['plane_perio']]
-                plane_epoch = [curre_curve[-1, 1]['plane_epoch']]
-                plane_radiu = [curre_curve[-1, 1]['plane_radiu']]
-                plane_mass = [curre_curve[-1, 1]['plane_mass']]
-                plane_incli_degre = np.array(
-                    [curre_curve[-1, 1]['plane_incli']])
-                plane_eccen = curre_curve[-1, 1]['plane_eccen']
-                plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
-                plane_densi = [curre_curve[-1, 1]['plane_densi']] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3))) 
-                # conversion from g/cm^3 to earth mass/radiu)
-            else:
-                plane_perio = curre_curve[-1, 1]['plane_perio']
-                plane_epoch = curre_curve[-1, 1]['plane_epoch']
-                plane_incli_degre = curre_curve[-1, 1]['plane_incli']
-                plane_radiu = curre_curve[-1, 1]['plane_radiu']
-                plane_mass = curre_curve[-1, 1]['plane_mass']
-                plane_eccen = curre_curve[-1, 1]['plane_eccen']
-                plane_sin_w = curre_curve[-1, 1]['plane_sin_w']
-                plane_densi = curre_curve[-1, 1]['plane_densi'] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))
-
-            moon_numbe = curre_curve[-1, 1]['moon_numbe']
-            if moon_numbe == 1:
-                moon_perio = [np.array([curre_curve[-1, 1]['moon_perio']])]
-                moon_epoch = [np.array([curre_curve[-1, 1]['moon_epoch']])]
-                moon_radiu = [np.array([curre_curve[-1, 1]['moon_radiu']])]
-                moon_mass = [[curre_curve[-1, 1]['moon_mass']]]
-                moon_eccen = curre_curve[-1, 1]['moon_eccen']
-                moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
-                moon_incli_radia = curre_curve[-1,
-                                               1]['moon_incli'] * np.pi / 180
-                moon_numbe = np.array([moon_numbe])
-                moon_densi = [np.array([curre_curve[-1, 1]['plane_densi']]) * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))]
-                                                                       
-            else:
-                moon_perio = curre_curve[-1, 1]['moon_perio']
-                moon_epoch = curre_curve[-1, 1]['moon_epoch']
-                moon_radiu = curre_curve[-1, 1]['moon_radiu']
-                moon_mass = curre_curve[-1, 1]['moon_mass']
-                moon_eccen = curre_curve[-1, 1]['moon_eccen']
-                moon_sin_w = curre_curve[-1, 1]['moon_sin_w']
-                moon_incli_radia = None
-                if curre_curve[-1, 1]['moon_incli'] is not None:
-                    moon_incli_radia = curre_curve[
-                        -1, 1]['moon_incli'] * np.pi / 180
-                moon_densi = curre_curve[-1, 1]['plane_densi'] * 1 / (5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3)))
-
-            plane_type = curre_curve[-1, 1]['plane_type']
-            type_limb_darke = curre_curve[-1, 1]['type_limb_darke']
-            linea_limb_darke_coeff = curre_curve[-1,
-                                                 1]['linea_limb_darke_coeff']
-            trape_trans = curre_curve[-1, 1]['trape_trans']
-            quadr_limb_darke_coeff = curre_curve[-1,
-                                                 1]['quadr_limb_darke_coeff']
-
-        else:
-            # Planets
-            plane_numbe = np.random.randint(1, plane_max_numbe + 1)
-            plane_index = np.arange(plane_numbe)
-            plane_perio = np.empty(plane_numbe)
-            plane_epoch = np.empty(plane_numbe)
-            plane_incli_radia = np.empty(plane_numbe)
-            plane_incli_degre = np.empty(plane_numbe)
-            # Assign planet feature values
+        # Planets
+        plane_numbe = np.random.randint(1, plane_max_numbe + 1)
+        plane_index = np.arange(plane_numbe)
+        plane_perio = np.empty(plane_numbe)
+        plane_epoch = np.empty(plane_numbe)
+        plane_incli_radia = np.empty(plane_numbe)
+        plane_incli_degre = np.empty(plane_numbe)
+        # Assign planet feature values
+        for i in plane_index:
+            plane_perio[i] = np.random.random() * 5 + 3
+            plane_incli_radia[i] = np.random.random() * 0.03
+            plane_incli_degre[i] = 180. / np.pi * np.arccos(
+                plane_incli_radia[i])
+        plane_epoch = tdpy.icdf_self(np.random.rand(plane_numbe), time_min,
+                                     time_max)
+        plane_eccen = 0
+        plane_sin_w = 0
+        if type_orbit_archi == 'planmoon' or type_orbit_archi == 'plan':
+            plane_radiu = np.empty(plane_numbe)
             for i in plane_index:
-                plane_perio[i] = np.random.random() * 4 + 2
-                plane_incli_radia[i] = np.random.random() * 0.03
-                plane_incli_degre[i] = 180. / np.pi * np.arccos(
-                    plane_incli_radia[i])
-            plane_epoch = tdpy.icdf_self(np.random.rand(plane_numbe), time_min,
-                                         time_max)
-            plane_eccen = 0
-            plane_sin_w = 0
-            if type_orbit_archi == 'planmoon' or type_orbit_archi == 'plan':
-                plane_radiu = np.empty(plane_numbe)
-                ###
-                for i in plane_index:
-                    plane_radiu[i] = tdpy.icdf_powr(np.random.rand(1), 1, 12, 1.8)[0]
-#                     plane_radiu[i] = 10 * np.random.random() + 1
-                ###
-                plane_mass = ephesus.retr_massfromradi(plane_radiu)
-                plane_densi = plane_mass / (4/3 * np.pi * plane_radiu**3)
+                plane_radiu[i] = tdpy.icdf_powr(np.random.rand(1), 1, 12, 1.8)[0]
+            plane_mass = ephesus.retr_massfromradi(plane_radiu)
+            plane_densi = plane_mass / (4/3 * np.pi * plane_radiu**3)
 
-            # Approximate total mass of the system
-            total_mass = stell_mass
-            plane_smax = ephesus.retr_smaxkepl(plane_perio, total_mass)
-            rsma = None
+        # Approximate total mass of the system
+        total_mass = stell_mass
+        plane_smax = ephesus.retr_smaxkepl(plane_perio, total_mass)
+        rsma = None
 
-            # Moon characteristics
-            if type_orbit_archi.endswith('moon'):
-                moon_numbe = np.empty(plane_numbe, dtype=int)
-                moon_radiu = [[] for i in plane_index]
-                moon_mass = [[] for i in plane_index]
-                moon_densi = [[] for i in plane_index]
-                moon_perio = [[] for i in plane_index]
-                moon_epoch = [[] for i in plane_index]
-                moon_smax = [[] for i in plane_index]
-                moon_index = [[] for i in plane_index]
-                # Hill radius of the planet
-                radihill = ephesus.retr_radihill(plane_smax,
-                                                 plane_mass / dictfact['msme'],
-                                                 stell_mass)
-                # Maximum semi-major axis of the moons
-                moon_max_smax = 0.5 * radihill
-                total_mass = np.sum(plane_mass) / dictfact['msme']
-                for i in plane_index:
-                    arry = np.arange(1, moon_max_numbe + 1)
-                    prob = arry**(-2.)
-                    prob /= np.sum(prob)
-                    moon_numbe[i] = np.random.choice(arry, p=prob)
-                    moon_index[i] = np.arange(moon_numbe[i])
-                    moon_smax[i] = np.empty(moon_numbe[i])
-                    moon_radiu[i] = tdpy.icdf_powr(
-                        np.random.rand(moon_numbe[i]), 0.1, 0.6, 1.8) * plane_radiu[i]
-                    moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
-                    moon_densi[i] = moon_mass[i] / (4/3 * np.pi * moon_radiu[i]**3)
-                    moon_min_smax = ephesus.retr_radiroch(
-                        plane_radiu[i], plane_densi[i], moon_densi[i])
-                    for ii in moon_index[i]:
-                        moon_smax[i][ii] = tdpy.icdf_powr(
-                            np.random.rand(), moon_min_smax[ii],
-                            moon_max_smax[i], 2.)
-                    moon_perio[i] = ephesus.retr_perikepl(
-                        moon_smax[i], total_mass)
-                    moon_epoch[i] = tdpy.icdf_self(
-                        np.random.rand(moon_numbe[i]), time_min, time_max)
-                # Check to make sure realistic semi-major axis length
-                if (moon_smax[i] > plane_smax[i] / 1.2).any():
-                    continue
-                # Not used in simulation at the moment
-                moon_eccen = 0
-                moon_sin_w = 0
-                moon_incli_radia = 0
-            else:
-                moon_perio = moon_epoch = moon_mass = moon_radiu \
+        # Moon characteristics
+        if type_orbit_archi.endswith('moon'):
+            moon_numbe = np.empty(plane_numbe, dtype=int)
+            moon_radiu = [[] for i in plane_index]
+            moon_mass = [[] for i in plane_index]
+            moon_densi = [[] for i in plane_index]
+            moon_perio = [[] for i in plane_index]
+            moon_epoch = [[] for i in plane_index]
+            moon_smax = [[] for i in plane_index]
+            moon_index = [[] for i in plane_index]
+            # Hill radius of the planet
+            radihill = ephesus.retr_radihill(plane_smax,
+                                             plane_mass / dictfact['msme'],
+                                             stell_mass)
+            # Maximum semi-major axis of the moons
+            moon_max_smax = 0.5 * radihill
+            total_mass = np.sum(plane_mass) / dictfact['msme']
+            for i in plane_index:
+                arry = np.arange(1, moon_max_numbe + 1)
+                prob = arry**(-2.)
+                prob /= np.sum(prob)
+                moon_numbe[i] = np.random.choice(arry, p=prob)
+                moon_index[i] = np.arange(moon_numbe[i])
+                moon_smax[i] = np.empty(moon_numbe[i])
+                moon_radiu[i] = tdpy.icdf_powr(
+                    np.random.rand(moon_numbe[i]), 0.2, 0.7, 1.8) * plane_radiu[i]
+                moon_mass[i] = ephesus.retr_massfromradi(moon_radiu[i])
+                moon_densi[i] = moon_mass[i] / (4/3 * np.pi * moon_radiu[i]**3)
+                moon_min_smax = ephesus.retr_radiroch(
+                    plane_radiu[i], plane_densi[i], moon_densi[i])
+                for ii in moon_index[i]:
+                    moon_smax[i][ii] = tdpy.icdf_powr(
+                        np.random.rand(), moon_min_smax[ii],
+                        moon_max_smax[i], 2.)
+                moon_perio[i] = ephesus.retr_perikepl(
+                    moon_smax[i], total_mass)
+                moon_epoch[i] = tdpy.icdf_self(
+                    np.random.rand(moon_numbe[i]), time_min, time_max)
+            # Check to make sure realistic semi-major axis length
+            if (moon_smax[i] > plane_smax[i] / 1.2).any():
+                continue
+            # Not used in simulation at the moment
+            moon_eccen = 0
+            moon_sin_w = 0
+            moon_incli_radia = 0
+        else:
+            moon_perio = moon_epoch = moon_mass = moon_radiu \
 = moon_incli_radia = moon_eccen = moon_sin_w = moon_densi = None
-                moon_numbe = 0
-                rsma = ephesus.retr_rsma(plane_radiu, stell_radiu, plane_smax)
+            moon_numbe = 0
+            rsma = ephesus.retr_rsma(plane_radiu, stell_radiu, plane_smax)
 
-            # Simulation settings
-            trape_trans = True
-            plane_type = 'plan'
-            type_limb_darke = 'none'
-            linea_limb_darke_coeff = 0.2
-            quadr_limb_darke_coeff = 0.2
+        # Simulation settings
+        trape_trans = True
+        plane_type = 'plan'
+        type_limb_darke = 'none'
+        linea_limb_darke_coeff = 0.2
+        quadr_limb_darke_coeff = 0.2
 
         # Create animation
         anima_name = ''
@@ -1019,7 +946,7 @@ curve[i + 1][0] - curve[i][0] < max_time_gap:
             curve.insert(i + 1, [curve[i][0] + caden, 'inter_spot'])
         else:
             i += 1
-    return curve
+    return np.array(curve)
 
 
 def cut_curve(curve, max_time_gap, min_lengt, stand_lengt):
@@ -1042,13 +969,14 @@ length.'''
     if curve[-2][0] - curve[-3][0] < max_time_gap:
         cut_index.append([start, len(curve) - 1])
     infor = curve[-1][1]
+    
     for curre_index in cut_index:
         curre_cut = curve[curre_index[0]:curre_index[1]]
         if len(curre_cut) > min_lengt:
             if len(curre_cut) <= stand_lengt:
                 # Copy information
                 curre_cut.append(['infor', infor.copy()])
-                curre_cut[-1][1]['cut_start_index'] = curre_index[0]
+#                 curre_cut[-1][1]['cut_start_index'] = curre_index[0]
                 cuts.append(np.array(curre_cut).astype(object))
             else:
                 # If the cut is greater than the standard length,
@@ -1057,6 +985,7 @@ length.'''
                 for i in range(0, len(curre_cut), stand_lengt - 1):
                     curre_cut_cut = curre_cut[i:i + stand_lengt - 1]
                     curre_cut_cut.append(['infor', infor.copy()])
+#                     curre_cut_cut[-1][1]['cut_start_index'] = curre_index[0] + i
                     if min_lengt < len(curre_cut_cut) <= stand_lengt:
                         cuts.append(np.array(curre_cut_cut).astype(object))
     # A list of numpy arrays
@@ -1259,7 +1188,7 @@ Currently: {start_stop_tic_id}.')
         # Highlight injection times
         if highl_injec:
             injec_label_name = 'Planet'
-            if data[i, -1, 1]['moon_numbe']:
+            if data[i, -1, 1]['plane_moon_cut_injec']:
                 injec_label_name = 'Planet and Moon'
             if data[i, -1, 1]['injec_times'] is not None and np.size(
                     data[i, -1, 1]['injec_times']):
@@ -1650,3 +1579,103 @@ def remov_TOI(data):
         if data[i, -1, 1]['toi']:
             toi_index.append(i)
     return np.delete(data, toi_index, axis=0)
+
+
+def chang_moon_injec(curve):
+    '''Adds or removes the moon signal from an injected curve.'''
+    # Check to see whether the moon signal should be added or removed
+    statu = 'add'
+    for i in range(len(curve)):
+        if curve[i, -1, 1]['plane_moon_cut_injec']:
+            statu = 'remov'
+            break
+            
+    if statu == 'add':
+        for i in range(len(curve)):
+            if curve[i, -1, 1]['moon_signa'] is not None:
+                cut_start_index = curve[i, -1, 1]['cut_start_index'] - curve[i, -1, 1]['initi_paddi']
+                cut_lengt = len(curve[i, find_start(curve[i]): -1])
+                curve[i, find_start(curve[i]):-1, 1] += curve[i, -1, 1]['moon_signa'] \
+[cut_start_index:cut_start_index + cut_lengt] - 1
+                curve[i, -1, 1]['plane_moon_cut_injec'] = True
+        return 'Added'
+    else:
+        for i in range(len(curve)):
+            if curve[i, -1, 1]['moon_signa'] is not None:
+                cut_start_index = curve[i, -1, 1]['cut_start_index'] - curve[i, -1, 1]['initi_paddi']
+                cut_lengt = len(curve[i, find_start(curve[i]): -1])
+                curve[i, find_start(curve[i]):-1, 1] -= curve[i, -1, 1]['moon_signa'] \
+[cut_start_index:cut_start_index + cut_lengt] - 1
+                curve[i, -1, 1]['plane_moon_cut_injec'] = False
+        return 'Removed'
+            
+        
+def binar_searc(data, targe, low=0, high=None):
+    '''Binary search algorithm, returns index of target or None if target \
+is not in the dataset.'''
+    if high is None:
+        high = len(data)
+    targe_index = (low + high) // 2
+    if data[targe_index] == targe:
+        return targe_index    
+    elif high > low:
+        if data[targe_index] > targe:
+            return binar_searc(data, targe, low, targe_index - 1)
+        elif data[targe_index] < targe:
+            return binar_searc(data, targe, targe_index + 1, high)
+    else:
+        return None
+    
+def show_histo(data,
+               featu,
+               bins=20,
+               featu_min=-np.inf,
+               featu_max=np.inf,
+               trans_type='plane_moon_cut_injec',
+               ignor_strin_none=True,
+               save_figur_path='',
+               save_figur_as='.pdf',
+               line_histo_chara={'histtype': 'step', 'color': 'mediumblue'},
+               backg_histo_chara={'alpha': 0.3, 'color': 'mediumblue'},
+               bar_graph_chara={'color':['red', 'blue', 'brown']},
+               figur_chara={'figsize': [15, 5]},
+               title_chara={'size': 16},
+               x_chara={'size': 14},
+               y_chara={'size': 14}):
+
+    featu_data = []
+    quant = None
+    for i in range(len(data)):
+        curre_data = data[i, -1, 1][featu]
+        if curre_data is not None:
+            if isinstance(curre_data, (int, float)):
+                featu_data.append(curre_data)
+                quant = True
+            elif isinstance(curre_data, (str)):
+                featu_data = bin_data(data, featu, bins, False, ignor_strin_none)
+                quant = False
+            else:
+                raise TypeError(f'Feature must be an int, float, or a string. Currently \
+{type(curre_data)}.')
+      
+    plt.figure(**figur_chara)
+    plt.xlabel(f'{forma_names[featu]}', **x_chara)
+    plt.ylabel(f'Occurences', **y_chara)
+    
+    if quant:
+        plt.hist(featu_data, bins, **line_histo_chara)
+        plt.hist(featu_data, bins, **backg_histo_chara)
+        plt.title(f'Histogram of {forma_names[featu].split(" [")[0]}', **title_chara)
+        if save_figur_path:
+            filen = f'{save_figur_path}histo-{featu}-{int(time.time())}'
+            plt.savefig(f'{filen}{save_figur_as}')
+    else:
+        heigh = []
+        for i in range(len(featu_data)):
+            heigh.append(len(featu_data[i]))
+        plt.bar(featu_data[:, 0], heigh, **bar_graph_chara)
+        plt.title(f'Bar Graph of {forma_names[featu].split(" [")[0]}', **title_chara)
+        if save_figur_path:
+            filen = f'{save_figur_path}bar-{featu}-{int(time.time())}'
+            plt.savefig(f'{filen}{save_figur_as}')
+    plt.show()       
