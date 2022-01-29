@@ -53,13 +53,7 @@ import warnings
 import ephesus
 import troia
 import tdpy
-import const
-infor = const.infor
-forma_names = const.forma_names
-main_path = const.main_path
-raw_tess_path = const.raw_tess_path
-tess_metad_path = const.tess_metad_path
-xom_data_path = const.xom_data_path
+from const import *
 
 # Do NOT use latex for matplotlib plots
 rc('text', usetex=False)
@@ -112,22 +106,17 @@ def retur_fits_data(file, path=f'{raw_tess_path}', featu=infor):
     secto_numbe = str(find_TIC_secto(file))
     if len(secto_numbe) != 2:
         secto_numbe = f'0{secto_numbe}'
-    light_curve = ephesus.read_tesskplr_file(f'{path}sector-{secto_numbe}/{file}')[0][:, 0:2]
+    light_curve = ephesus.read_tesskplr_file(f'{path}sector-{secto_numbe}/{file}')[0][:, 0:2].tolist()
     
-    light_curve = np.array(light_curve).astype(object)
     # Insert cell for dictionary containing features
-    light_curve = np.insert(light_curve,
-                       len(light_curve),
-                       np.zeros((1, 2), dtype=object),
-                       axis=0)
-    light_curve[-1, 0] = 'infor'
+    light_curve.append(['infor', 0])
 
     # Populate basic features
     if len(featu) > 0:
-        light_curve[-1, 1] = featu.copy()
-        light_curve[-1, 1]['file_name'] = file
-        light_curve[-1, 1]['tic_id'] = find_TIC_ID(file)
-        light_curve[-1, 1]['curve_type'] = 'Light Curve'
+        light_curve[-1][1] = featu.copy()
+        light_curve[-1][1]['file_name'] = file
+        light_curve[-1][1]['tic_id'] = find_TIC_ID(file)
+        light_curve[-1][1]['curve_type'] = 'Light Curve'
         
     return light_curve
 
