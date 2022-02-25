@@ -699,7 +699,8 @@ curre_curve[-1, 1]['eb']:
         curre_curve[-1, 1]['trape_trans'] = trape_trans
         curre_curve[-1, 1]['curve_type'] = 'Injected Curve'
         curre_curve[-1, 1]['injec_times'] = relat_flux_time
-        curre_curve[-1, 1]['signa'] = relat_flux
+#         Turned off for memory purposes 
+#         curre_curve[-1, 1]['signa'] = relat_flux
         curre_curve[-1, 1]['type_orbit_archi'] = type_orbit_archi
         curre_curve[-1, 1]['plane_type'] = plane_type
 
@@ -753,10 +754,9 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
                 curre_curve[-1, 1]['moon_densi'] = moon_densi[0][0]
                 if separ_plane_moon:
-                    curre_curve[
-                        -1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
-                    curre_curve[-1,
-                                1]['moon_signa'] = relat_flux_dicti['rflxmoon']
+#                     Turned off for memory purposes
+#                     curre_curve[-1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
+                    curre_curve[-1, 1]['moon_signa'] = relat_flux_dicti['rflxmoon']
             else:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch
                 curre_curve[-1, 1]['moon_perio'] = moon_perio
@@ -806,7 +806,16 @@ class resto_best_valid_accur(keras.callbacks.Callback):
 end of the best epoch ({self.best_acc:.2%}).")
         self.model.set_weights(self.best_weights)
 
+        
+class email_train_progr(keras.callbacks.Callback):
+    '''Sends the validation accuracy of the model at the end of training.'''
+    def __init__(self, patience=0):
+        super().__init__()
 
+    def on_train_end(self, logs=None):
+        send_task_comple_email(f'Model validation accuracy is {logs.get("val_accuracy"):.2%}')
+        
+        
 def retur_predi_true_false(predi, y_data):
     '''Returns a numpy array containing whether each prediction was true or false.'''
     return np.array(abs(predi - y_data) < 0.5)
