@@ -1479,27 +1479,45 @@ def show_featu_preci_recal(data,
     # Plot precision and recall as a function of a numerical feature
     else:
         binne_data = bin_data(data, featu, bins, equal_width_bins)
-        binne_data_len = 0 
-        for i in range(len(binne_data)):
-            binne_data_len += len(binne_data[i])
         preci = []
         recal = []
-        previ_infor_lengt = 0
+
+        # Used for calculating the false positive correction
+        total_tp = 0
+        total_fp = 0
+        total_lengt = 0
+        for i in range(len(binne_data)):
+            for ii in range(len(binne_data[i])):
+                curre_curve_index = binne_data[i][ii][0].astype(int)
+                injec_statu = data[curre_curve_index, -1, 1][trans_type]
+                predi_float = predi[curre_curve_index]
+                total_tp += injec_statu and predi_float > cutof
+                total_fp += not injec_statu and predi_float > cutof
+                total_lengt += 1
+        # Total number of missing false positives
+        missi_fp = sum(predi > cutof) - total_tp - total_fp
+        
         for i in range(len(binne_data)):
             tp = 0
             fp = 0
             fn = 0
             for ii in range(len(binne_data[i])):
                 # Keep track of true positives, false positives, and false negatives
-                tp += data[binne_data[i][ii][0].astype(int), -1,
-                           1][trans_type] and predi[previ_infor_lengt +
-                                                    ii] > cutof
-                fp += not data[binne_data[i][ii][0].astype(int), -1,
-                               1][trans_type] and predi[previ_infor_lengt +
-                                                        ii] > cutof
-                fn += data[binne_data[i][ii][0].astype(int), -1,
-                           1][trans_type] and not predi[previ_infor_lengt +
-                                                        ii] > cutof
+                curre_curve_index = binne_data[i][ii][0].astype(int)
+                injec_statu = data[curre_curve_index, -1, 1][trans_type]
+                predi_float = predi[curre_curve_index]
+                tp += injec_statu and predi_float > cutof
+                fp += not injec_statu and predi_float > cutof
+                fn += injec_statu and predi_float < cutof
+            
+            # Add a correction to the false positives since many are not injected
+            # so they may not have the feature used in binning.
+            # Therefore, I proportionaly add the number of missing false positives
+            # to the false positives to account for this disparity.
+            # This is not a true representative of how many false positives are in
+            # each bin, but is close enough for our purposes
+            fp += missi_fp * len(binne_data[i]) / total_lengt
+            
             # If divide by 0, ignore
             try:
                 if tp or fp:
@@ -1515,9 +1533,6 @@ def show_featu_preci_recal(data,
                         [np.mean(binne_data[i][:, 1]), tp / (tp + fn), 1 / (tp + fn)**(0.5)])
             except:
                 pass
-            # Keep track of the amount of previously binned data
-            previ_infor_lengt += len(binne_data[i])
-            
         # Convert precision and recall from lists to numpy arrays
         preci = np.array(preci)
         recal = np.array(recal)
@@ -1579,6 +1594,7 @@ def remov_TOI(data):
     return np.delete(data, toi_index, axis=0)
 
 
+#CHECK THIS FUCKING FUNCTION. SHITS WEIRD ASL
 def chang_moon_injec(curve):
     '''Adds or removes the moon signal from an injected curve.'''
     # Check to see whether the moon signal should be added or removed
@@ -1590,7 +1606,7 @@ def chang_moon_injec(curve):
             
     if statu == 'add':
         for i in range(len(curve)):
-            if curve[i, -1, 1]['moon_signa'] is not None:
+            if curve[i, -1, 1]['unmod_plane_moon_cut_injec']:
                 cut_start_index = curve[i, -1, 1]['cut_start_index'] - curve[i, -1, 1]['initi_paddi']
                 cut_lengt = len(curve[i, find_start(curve[i]): -1])
                 curve[i, find_start(curve[i]):-1, 1] += curve[i, -1, 1]['moon_signa'] \
@@ -1599,7 +1615,7 @@ def chang_moon_injec(curve):
         return 'Added'
     else:
         for i in range(len(curve)):
-            if curve[i, -1, 1]['moon_signa'] is not None:
+            if curve[i, -1, 1]['unmod_plane_moon_cut_injec']:
                 cut_start_index = curve[i, -1, 1]['cut_start_index'] - curve[i, -1, 1]['initi_paddi']
                 cut_lengt = len(curve[i, find_start(curve[i]): -1])
                 curve[i, find_start(curve[i]):-1, 1] -= curve[i, -1, 1]['moon_signa'] \

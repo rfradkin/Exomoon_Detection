@@ -53,7 +53,8 @@ infor = {
     'trape_trans': None,
     'type_calcu': None,
     'type_limb_darke': None,
-    'type_orbit_archi': None
+    'type_orbit_archi': None,
+    'unmod_plane_moon_cut_injec': None
 }
 
 forma_names = {
@@ -111,7 +112,8 @@ forma_names = {
     'trape_trans': 'Trapezoidal Transits',
     'type_calcu': 'Type Calculation',
     'type_limb_darke': 'Type of Limb Darkening',
-    'type_orbit_archi': 'Type of Orbital Architecture'
+    'type_orbit_archi': 'Type of Orbital Architecture',
+    'unmod_plane_moon_cut_injec': 'Unmodified Cut Injected (Planet, Moon)'
 }
 
 
