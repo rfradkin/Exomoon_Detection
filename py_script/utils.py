@@ -61,7 +61,7 @@ rc('text', usetex=False)
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 
-def retur_secto_files(path=f'{raw_tess_path}', secto_range=[1,27], remov_dupli=False):
+def retur_secto_files(secto_range=[1,27], remov_dupli=False, path=f'{raw_tess_path}'):
     '''Returns the file names for sectors of fits data'''
     file_names = []
     # Loops through directories to find fits files
@@ -345,6 +345,7 @@ def show_tpr_fpr(data,
                  featu,
                  bins=35,
                  overp=False,
+                 warn_missi_fp=True,
                  detec_type='plane_moon_cut_injec',
                  save_figur_path='',
                  width=20,
@@ -354,14 +355,16 @@ TPR and FPR in two plots or overlayed in one.'''
     # infor is an array containing the feature, true positive status, true negative status,
     # and false positive status (only contains relevant data)
     infor = []
-    ### Double check function
+    # Missing false positives that are not included since they have no moon
+    # and therefore no moon feature
+    missi_fp = 0
     # Binary prediction
     binar_predi = predi > cutof
     for i in range(len(data)):
         curre_featu = data[i, -1, 1][detec_type]
         if not isinstance(curre_featu,
                           (int, float)) and curre_featu is not None:
-            raise TypeError(f'')
+            raise TypeError(f'Feature must be an integer or float, currently: {type(curre_featu)}')
         if data[i, -1, 1][detec_type] == binar_predi[i]:
             if curre_featu:
                 if data[i, -1, 1][featu] is not None:
@@ -372,6 +375,10 @@ TPR and FPR in two plots or overlayed in one.'''
         elif not data[i, -1, 1][detec_type] and binar_predi[i]:
             if data[i, -1, 1][featu] is not None:
                 infor.append([data[i, -1, 1][featu], False, False, True])
+            else:
+                missi_fp += 1
+    if warn_missi_fp:
+        warnings.warn(f'Unaccounted for false positives: {missi_fp}')
     infor = np.array(infor)
     # Sort infor to prepare for binning
     order_infor = np.argsort(infor[:, 0])
@@ -392,6 +399,7 @@ TPR and FPR in two plots or overlayed in one.'''
                 tp += infor[ii][1]
                 tn += infor[ii][2]
                 fp += infor[ii][3]
+        print(tp, tn, fp)
         pr.append([tp / (tp + fp), fp / (tn + fp)])
     pr = np.array(pr)
     if overp:
@@ -1594,7 +1602,6 @@ def remov_TOI(data):
     return np.delete(data, toi_index, axis=0)
 
 
-#CHECK THIS FUCKING FUNCTION. SHITS WEIRD ASL
 def chang_moon_injec(curve):
     '''Adds or removes the moon signal from an injected curve.'''
     # Check to see whether the moon signal should be added or removed
