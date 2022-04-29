@@ -40,11 +40,12 @@ import seaborn as sns
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras import backend as K
 
 import sklearn.metrics as metrics
 
 import smtplib
-from email.mime.image import MIMEImage
+from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 import warnings
@@ -440,17 +441,26 @@ TPR and FPR in two plots or overlayed in one.'''
     plt.show()
 
 
-def send_task_comple_email(task,
-                           recie='fradkin.rom@gmail.com',
-                           sende='romfradkin22@gmail.com'):
+def send_task_comple_email(subje='',
+                           messa='',
+                           high_prior=False,
+                           recie='rfstatusupdates@gmail.com',
+                           high_prior_recie='fradkin.rom@gmail.com',
+                           sende='rfstatusupdates@gmail.com'):
     '''Sends an email informing the receiver that a task is complete.'''
-    msg = MIMEMultipart()
-    msg['Subject'] = task
-    msg['From'] = sende
-    msg['To'] = recie
-    s = smtplib.SMTP('localhost')
-    s.sendmail(sende, recie, msg.as_string())
-    s.quit()
+    if subje=='' and messa=='':
+        raise ValueError('"subje" and "messa" cannot both be empty strings.')
+    email = MIMEMultipart()
+    email['Subject'] = subje
+    email['From'] = sende
+    email.attach(MIMEText(messa))
+    if high_prior:
+        email['To'] = high_prior_recie
+    else:
+        email['To'] = recie
+    serve = smtplib.SMTP('localhost')
+    serve.sendmail(sende, recie, email.as_string())
+    serve.quit()
 
 
 def find_neare_index(data, value):
@@ -798,30 +808,62 @@ def retur_rando_sampl(numbe_of_sampl, data_lengt):
 
 class resto_best_valid_accur(keras.callbacks.Callback):
     '''Restores the best validation accuracy at the end of training.'''
-    def __init__(self, patience=0):
+    def __init__(self):
         super().__init__()
-        self.best_weights = None
-        self.best_acc = 0
+        self.best_weight = None
+        self.highe_valid_accur = 0
 
     def on_epoch_end(self, epoch, logs=None):
-        current = logs.get("val_accuracy")
-        if np.greater(current, self.best_acc):
-            self.best_acc = current
-            self.best_weights = self.model.get_weights()
+        curre_valid_accur = logs.get('val_accuracy')
+        if np.greater(curre_valid_accur, self.highe_valid_accur):
+            self.highe_valid_accur = curre_valid_accur
+            self.best_weight = self.model.get_weights()
 
     def on_train_end(self, logs=None):
         print(f"\nRestoring model weights from the \
-end of the best epoch ({self.best_acc:.2%}).")
-        self.model.set_weights(self.best_weights)
+end of the best epoch ({self.highe_valid_accur:.1%}).")
+        self.model.set_weights(self.best_weight)
 
-        
+
 class email_train_progr(keras.callbacks.Callback):
     '''Sends the validation accuracy of the model at the end of training.'''
-    def __init__(self, patience=0):
+    def __init__(self):
         super().__init__()
-
+        # Why do I keep track of the validation accuracy? Wonderful question.
+        # For whatever reason, on_train_end, the keys from the logs no longer
+        # exist in this version of keras. Therefore, keeping track of validation 
+        # after each epoch is the work around.
+        self.highe_valid_accur = 0
+        self.curre_epoch_numbe = 0
+        self.preci = 0
+        self.recal = 0
+   
+    def on_epoch_end(self, epoch, logs=None):
+        self.curre_epoch_numbe += 1
+        curre_valid_accur = logs.get('val_accuracy')
+        if self.highe_valid_accur < curre_valid_accur:
+            self.highe_valid_accur = curre_valid_accur
+            self.preci = logs.get('val_preci')
+            self.recal = logs.get('val_recal')
+    
     def on_train_end(self, logs=None):
-        send_task_comple_email(f'Model validation accuracy is {logs.get("val_accuracy"):.2%}')
+        infor = pd.read_csv(f'{main_path}rnns/tuner_backg_infor.csv')
+        statu = 'Consistent'
+        if self.highe_valid_accur > infor['best_accur'][0]:
+            tuner_messa_backg_infor(setup=False, best_accur=self.highe_valid_accur,
+                               best_preci=self.preci, best_recal=self.recal, 
+                               best_trial_numbe=(infor['curre_trial_numbe'][0] + 1), curre_accur=self.highe_valid_accur,
+                               curre_preci=self.preci, curre_recal=self.recal, curre_epoch=self.curre_epoch_numbe)
+            if infor['curre_trial_numbe'][0] == 0:
+                statu = 'Initial'
+            else:
+                statu = 'Improvement'
+        else:
+            tuner_messa_backg_infor(setup=False, curre_accur=self.highe_valid_accur,
+                               curre_preci=self.preci, curre_recal=self.recal, curre_epoch=self.curre_epoch_numbe)   
+            
+        infor = pd.read_csv(f'{main_path}rnns/tuner_backg_infor.csv')
+        send_task_comple_email(f'{statu} -- {infor["curre_trial_numbe"][0]} / {infor["total_trial_numbe"][0]}', tuner_messa_updat(infor))
         
         
 def retur_predi_true_false(predi, y_data):
@@ -1700,3 +1742,80 @@ def show_histo(data,
             filen = f'{save_figur_path}bar-{featu}-{int(time.time())}'
             plt.savefig(f'{filen}{save_figur_as}')
     plt.show()       
+    
+    
+def count(start=1):
+    '''Counts the number of occurences using a generator.'''
+    count = start
+    while True:
+        yield count
+        count += 1
+        
+def tuner_messa_updat(infor):
+    curre_time_elaps = secon_to_hours_minut_secon(infor['curre_time'][0] - infor['previ_time'][0])
+    total_time_elaps = secon_to_hours_minut_secon(infor['curre_time'][0] - infor['start_time'][0])
+    estim_finis_time_unix = time.time() + ((infor['curre_time'][0] - infor['start_time'][0]) / \
+infor['curre_trial_numbe'][0]) * (infor['total_trial_numbe'][0] - infor['curre_trial_numbe'][0])
+    estim_finis_time_human = time.ctime(estim_finis_time_unix)
+    messa = \
+f'''\
+Trial Number: {infor['curre_trial_numbe'][0]} / {infor['total_trial_numbe'][0]}
+Accuracy, Precision, Recall: {infor['curre_accur'][0]:.2%}, {infor['curre_preci'][0]:.2%}, {infor['curre_recal'][0]:.2%}
+Epochs Utilized: {infor['curre_epoch'][0]} / {infor['total_epoch_numbe'][0]}
+Time Elapsed: {curre_time_elaps}
+
+Total Time Elapsed: {total_time_elaps}
+Estimated Finish: {estim_finis_time_human}
+
+Best Trial Number: {infor['best_trial_numbe'][0]}
+A, P, R: {infor['best_accur'][0]:.2%}, {infor['best_preci'][0]:.2%}, {infor['best_recal'][0]:.2%}
+
+Baseline A, P, R: {infor['basel_accur'][0]:.2%}, {infor['basel_preci'][0]:.2%}, {infor['basel_recal'][0]:.2%}
+Trial Start Time: {infor['start_time'][0]}
+(All Statistics Are Validation Results)'''
+    return messa
+
+def tuner_messa_backg_infor(setup=True, total_trial_numbe=None, total_epoch_numbe=None,
+                           basel_accur=None, basel_preci=None, basel_recal=None, best_accur=None,
+                           best_preci=None, best_recal=None, best_trial_numbe=None, curre_accur=None,
+                           curre_preci=None, curre_recal=None, curre_epoch=None):
+    if setup:
+        initi_time = time.time()
+        infor = pd.DataFrame({'start_time': [initi_time], 
+                            'previ_time': [initi_time],
+                            'total_trial_numbe': [total_trial_numbe],
+                            'total_epoch_numbe': [total_epoch_numbe],
+                            'basel_accur': [basel_accur],
+                            'basel_preci': [basel_preci],
+                            'basel_recal': [basel_recal],
+                            'best_accur': [0],
+                            'curre_trial_numbe': [0]})
+    else:
+        infor = pd.read_csv(f'{main_path}rnns/tuner_backg_infor.csv')
+        if best_accur is not None:
+            infor['best_accur'] = best_accur
+            infor['best_preci'] = best_preci
+            infor['best_recal'] = best_recal
+            infor['best_accur'] = best_accur
+            infor['best_trial_numbe'] = best_trial_numbe
+        infor['curre_accur'] = curre_accur
+        infor['curre_preci'] = curre_preci
+        infor['curre_recal'] = curre_recal
+        infor['curre_epoch'] = curre_epoch
+        infor['curre_trial_numbe'] += 1
+        infor['curre_time'] = time.time()
+
+    infor.to_csv(f'{main_path}rnns/tuner_backg_infor.csv', index=False)
+    
+def recal(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall_keras = true_positives / (possible_positives + K.epsilon())
+    return recall_keras
+
+
+def preci(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision_keras = true_positives / (predicted_positives + K.epsilon())
+    return precision_keras
