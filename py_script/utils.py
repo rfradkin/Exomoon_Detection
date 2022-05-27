@@ -44,6 +44,9 @@ from tensorflow.keras import backend as K
 
 import sklearn.metrics as metrics
 
+from datetime import datetime
+from pytz import timezone
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -1756,7 +1759,7 @@ def tuner_messa_updat(infor):
     total_time_elaps = secon_to_hours_minut_secon(infor['curre_time'][0] - infor['start_time'][0])
     estim_finis_time_unix = time.time() + ((infor['curre_time'][0] - infor['start_time'][0]) / \
 infor['curre_trial_numbe'][0]) * (infor['total_trial_numbe'][0] - infor['curre_trial_numbe'][0])
-    estim_finis_time_human = time.ctime(estim_finis_time_unix)
+    estim_finis_time_human = str(datetime.fromtimestamp(estim_finis_time_unix, timezone('US/Central'))).split('.')[0]
     messa = \
 f'''\
 Trial Number: {infor['curre_trial_numbe'][0]} / {infor['total_trial_numbe'][0]}
@@ -1765,7 +1768,7 @@ Epochs Utilized: {infor['curre_epoch'][0]} / {infor['total_epoch_numbe'][0]}
 Time Elapsed: {curre_time_elaps}
 
 Total Time Elapsed: {total_time_elaps}
-Estimated Finish: {estim_finis_time_human}
+Estimated Finish: {estim_finis_time_human} CT
 
 Best Trial Number: {infor['best_trial_numbe'][0]}
 A, P, R: {infor['best_accur'][0]:.2%}, {infor['best_preci'][0]:.2%}, {infor['best_recal'][0]:.2%}
@@ -1783,6 +1786,7 @@ def tuner_messa_backg_infor(setup=True, total_trial_numbe=None, total_epoch_numb
         initi_time = time.time()
         infor = pd.DataFrame({'start_time': [initi_time], 
                             'previ_time': [initi_time],
+                            'curre_time': [initi_time],
                             'total_trial_numbe': [total_trial_numbe],
                             'total_epoch_numbe': [total_epoch_numbe],
                             'basel_accur': [basel_accur],
@@ -1803,6 +1807,7 @@ def tuner_messa_backg_infor(setup=True, total_trial_numbe=None, total_epoch_numb
         infor['curre_recal'] = curre_recal
         infor['curre_epoch'] = curre_epoch
         infor['curre_trial_numbe'] += 1
+        infor['previ_time'] = infor['curre_time']
         infor['curre_time'] = time.time()
 
     infor.to_csv(f'{main_path}rnns/tuner_backg_infor.csv', index=False)
@@ -1819,3 +1824,23 @@ def preci(y_true, y_pred):
     predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
     precision_keras = true_positives / (predicted_positives + K.epsilon())
     return precision_keras
+
+def curre_time(timez='US/Central'):
+    '''Returns the current day and time in a human readable format.'''
+    return datetime.now(timezone(timez)).strftime("%d-%m-%Y_%H:%M:%S")
+
+class custo_model_check(keras.callbacks.Callback):
+    '''Restores the best validation accuracy at the end of training.'''
+    def __init__(self, path):
+        super().__init__()
+        self.highe_valid_accur = 0
+        self.path = path
+
+    def on_epoch_end(self, epoch, logs=None):
+        curre_valid_accur = logs.get('val_accuracy')
+        if np.greater(curre_valid_accur, self.highe_valid_accur):
+            self.highe_valid_accur = curre_valid_accur
+            
+    def on_train_end(self, logs=None):
+        infor = pd.read_csv(f'{main_path}rnns/tuner_backg_infor.csv')
+        self.model.save(f'{self.path}t:{infor["curre_trial_numbe"][0]}_va:{self.highe_valid_accur:.3}.h5')
