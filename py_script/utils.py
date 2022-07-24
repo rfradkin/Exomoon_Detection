@@ -522,7 +522,7 @@ def injec_signa(curve,
                 plane_max_numbe=1,
                 moon_max_numbe=1,
                 type_orbit_archi='planmoon',
-                separ_plane_moon=False,
+                separ_plane_moon=True,
                 anima_path=None):
     '''Returns an injected light curve with exoplanets and exomoons.'''
     
@@ -683,25 +683,21 @@ curre_curve[-1, 1]['eb']:
             boolcompmoon=separ_plane_moon)
 
         relat_flux = relat_flux_dicti['rflx']
-
-        # Remove possible first value edge case
-        if relat_flux[0] != 1 and relat_flux[1] == 1:
-            relat_flux[0] = 1
-
-        # Find signal times
-        if len(np.where(relat_flux < 1)[0]) > 1:
-            relat_flux_index = find_signa_start_stop_index(relat_flux)
-            relat_flux_time = []
-            for i in range(len(relat_flux_index)):
-                relat_flux_time.append([
-                    curre_curve[find_start(curre_curve) +
-                                relat_flux_index[i][0], 0],
-                    curre_curve[find_start(curre_curve) +
-                                relat_flux_index[i][1], 0]
-                ])
-        else:
-            relat_flux_time = [[]]
-        relat_flux_time = np.array(relat_flux_time)
+        
+        # plane_trans_durat = calcu_trans_lengt(relat_flux_dicti['rflxcomp'])
+        # print(plane_trans_durat)
+        
+        # Find the planet transit length for snr calculations
+        try:
+            print('here')
+            curre_curve[-1, 1]['plane_trans_durat'] = calcu_trans_lengt(relat_flux_dicti['rflxcomp'])
+            # print(plane_trans_durat)
+        except KeyError:
+            # plane_trans_durat = None
+            print('here1')
+            pass
+        
+        relat_flux_time = deter_signa_times(relat_flux, curre_curve)
 
         # Add signal to curve
         curre_curve[find_start(curre_curve):-1, 1] += relat_flux - 1
@@ -711,7 +707,7 @@ curre_curve[-1, 1]['eb']:
                 moon_densi[ii] *= 5.972E27 * 1 / (4 / 3 * np.pi * (6.371E8 ** 3))
             
         # Add characteristics to each curve's dictionary
-        curre_curve[-1, 1]['max_ampli'] = (min(relat_flux) - 1) * -1000
+        curre_curve[-1, 1]['max_ampli'] = -(min(relat_flux) - 1)
         curre_curve[-1, 1]['plane_numbe'] = plane_numbe
         curre_curve[-1, 1]['curve_injec'] = True
         curre_curve[-1, 1]['type_limb_darke'] = type_limb_darke
@@ -720,8 +716,8 @@ curre_curve[-1, 1]['eb']:
         curre_curve[-1, 1]['trape_trans'] = trape_trans
         curre_curve[-1, 1]['curve_type'] = 'Injected Curve'
         curre_curve[-1, 1]['injec_times'] = relat_flux_time
-#         Turned off for memory purposes 
-#         curre_curve[-1, 1]['signa'] = relat_flux
+        # Turned off for memory purposes 
+        curre_curve[-1, 1]['signa'] = relat_flux
         curre_curve[-1, 1]['type_orbit_archi'] = type_orbit_archi
         curre_curve[-1, 1]['plane_type'] = plane_type
 
@@ -775,9 +771,14 @@ curre_curve[-1, 1]['eb']:
                 curre_curve[-1, 1]['moon_sin_w'] = moon_sin_w
                 curre_curve[-1, 1]['moon_densi'] = moon_densi[0][0]
                 if separ_plane_moon:
-#                     Turned off for memory purposes
-#                     curre_curve[-1, 1]['plane_signa'] = relat_flux_dicti['rflxcomp']
-                    curre_curve[-1, 1]['moon_signa'] = relat_flux_dicti['rflxmoon']
+                    relat_flux_plane = relat_flux_dicti['rflxcomp']
+                    relat_flux_moon = relat_flux_dicti['rflxmoon']
+                    relat_flux_plane_time = deter_signa_times(relat_flux_plane, curre_curve)
+                    relat_flux_moon_time = deter_signa_times(relat_flux_moon, curre_curve)
+                    curre_curve[-1, 1]['plane_signa'] = relat_flux_plane
+                    curre_curve[-1, 1]['moon_signa'] = relat_flux_moon
+                    curre_curve[-1, 1]['plane_signa_time'] = relat_flux_plane_time
+                    curre_curve[-1, 1]['moon_signa_time'] = relat_flux_moon_time
             else:
                 curre_curve[-1, 1]['moon_epoch'] = moon_epoch
                 curre_curve[-1, 1]['moon_perio'] = moon_perio
@@ -1128,11 +1129,17 @@ def retur_title(curve,
                 featu,
                 uniqu_featu='',
                 ignor_zeros=True,
-                inclu_TIC_ID=True):
+                ignor_simul_featu_uninj=True,
+                inclu_TIC_ID=True,
+                detec_type='plane_moon_cut_injec'):
     '''Returns a title containing the features.'''
     infor = curve[-1, 1]
     title = ''
     numbe_featu = 0
+    # The name of simulated features start with these keywords
+    # These are to be ignored if ignore the simulated feature for uninjected
+    # curves is turned on
+    simul_name_start = ['plane', 'moon_', 'ratio']
     if uniqu_featu:
         title = f'{uniqu_featu}, '
         numbe_featu += 1
@@ -1140,21 +1147,42 @@ def retur_title(curve,
         title = f'{title}{forma_names["tic_id"]}: {infor["tic_id"]},'
         numbe_featu += 1
     for curre_featu in featu:
+        simul_featu_flag=False
         if isinstance(infor[curre_featu], (int, str, np.int64)):
             # Use else statement for cut_numbe because cut_numbe can be 0
             if ignor_zeros and curre_featu != 'cut_numbe':
                 if infor[curre_featu]:
-                    title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
-                    numbe_featu += numbe_featu
+                    if ignor_simul_featu_uninj and not infor[detec_type]:
+                        for simul_chara in simul_name_start:
+                            if curre_featu[:5] == simul_chara:
+                                simul_featu_flag = True
+                        if simul_featu_flag:
+                            numbe_featu += 1 
+                        else:
+                            title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
+                            numbe_featu += 1                                
+                    else:
+                        title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
+                        numbe_featu += 1
             else:
                 title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]},'
                 numbe_featu += 1
         elif isinstance(infor[curre_featu], (float, np.float64)):
             if ignor_zeros:
                 if infor[curre_featu]:
-                    # Round after 4 digits
-                    title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
-                    numbe_featu += 1
+                    if ignor_simul_featu_uninj and not infor[detec_type]:
+                        for simul_chara in simul_name_start:
+                            if curre_featu[:5] == simul_chara:
+                                simul_featu_flag = True
+                        if simul_featu_flag:
+                            numbe_featu += 1 
+                        else:
+                            # Round after 4 digits
+                            title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
+                            numbe_featu += 1
+                    else:
+                        title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
+                        numbe_featu += 1
             else:
                 title = f'{title} {forma_names[curre_featu]}: {infor[curre_featu]:.4},'
                 numbe_featu += 1
@@ -1173,6 +1201,7 @@ def show_curve(data,
                show_signa=False,
                ignor_zeros=True,
                save_figur_path=None,
+               save_figur_name=None,
                figur_chara={'figsize': [15, 5]},
                title_chara={},
                x_chara={},
@@ -1238,22 +1267,43 @@ Currently: {start_stop_tic_id}.')
         axes[i - start].set_ylabel('Relative Flux', **y_chara)
         # Highlight injection times
         if highl_injec:
-            injec_label_name = 'Planet'
-            if data[i, -1, 1]['plane_moon_cut_injec']:
-                injec_label_name = 'Planet and Moon'
-            if data[i, -1, 1]['injec_times'] is not None and np.size(
-                    data[i, -1, 1]['injec_times']):
-                for injec_times in data[i, -1, 1]['injec_times']:
-                    if data[i, find_start(data[i]),
-                            0] < injec_times[0] < injec_times[1] < data[i, -2,
-                                                                        0]:
-                        axes[i - start].axvspan(injec_times[0] - 0.05,
-                                                injec_times[1] + 0.05,
-                                                facecolor='black',
-                                                alpha=0.22,
-                                                label=injec_label_name)
-                        injec_label_name = None
-                        axes[i - start].legend(**legen_chara)
+            if data[i, -1, 1]['plane_cut_injec']:
+                injec_label_name = 'Planet'
+                if data[i, -1, 1]['injec_times'] is not None and np.size(data[i, -1, 1]['injec_times']):
+                    for injec_times in data[i, -1, 1]['injec_times']:
+                        if data[i, find_start(data[i]),0] < injec_times[0] < injec_times[1] < data[i, -2,0]:
+                            axes[i - start].axvspan(injec_times[0] - 0.05,
+                                                    injec_times[1] + 0.05,
+                                                    facecolor='green',
+                                                    alpha=0.22,
+                                                    label=injec_label_name)
+                            injec_label_name = None
+                            axes[i - start].legend(**legen_chara)            
+            elif data[i, -1, 1]['plane_moon_cut_injec']:
+                if data[i, -1, 1]['plane_signa_time'] is not None and np.size(data[i, -1, 1]['plane_signa_time']):
+                    injec_label_name = 'Planet'
+                    for injec_times in data[i, -1, 1]['plane_signa_time']:
+                        if data[i, find_start(data[i]),0] < injec_times[0] < injec_times[1] < data[i, -2,0]:
+                            axes[i - start].axvspan(injec_times[0],
+                                                    injec_times[1],
+                                                    facecolor='red',
+                                                    alpha=0.2,
+                                                    label=injec_label_name)
+                            injec_label_name = None
+                            axes[i - start].legend(**legen_chara)
+                            
+                if data[i, -1, 1]['moon_signa_time'] is not None and \
+                np.size(data[i, -1, 1]['moon_signa_time']):
+                    injec_label_name = 'Moon'
+                    for injec_times in data[i, -1, 1]['moon_signa_time']:
+                        if data[i, find_start(data[i]),0] < injec_times[0] < injec_times[1] < data[i, -2,0]:
+                            axes[i - start].axvspan(injec_times[0],
+                                                    injec_times[1],
+                                                    facecolor='blue',
+                                                    alpha=0.2,
+                                                    label=injec_label_name)
+                            injec_label_name = None
+                            axes[i - start].legend(**legen_chara)
         # Highlight cut times
         if highl_cuts and data[i, -1, 1]['cut_numbe'] is None and \
 data[i, -1, 1]['cut_times'] is not None:
@@ -1276,10 +1326,14 @@ data[i, -1, 1]['cut_times'] is not None:
 
     figur.tight_layout()
     if save_figur_path:
-        figur.savefig(f'{save_figur_path}curves-{int(time.time())}.pdf')
+        if save_figur_name is not None:
+            figur.savefig(f'{save_figur_path}{save_figur_name}.pdf')
+        else:
+            figur.savefig(f'{save_figur_path}curves-{int(time.time())}.pdf')
+
     figur.show()
-    
-    # Reset the figsizd because running the code can change the parameter
+
+    # Reset the figsize because running the code can change the parameter
     figur_chara['figsize'] = [15, 5]
 
 
@@ -1844,3 +1898,147 @@ class custo_model_check(keras.callbacks.Callback):
     def on_train_end(self, logs=None):
         infor = pd.read_csv(f'{main_path}rnns/tuner_backg_infor.csv')
         self.model.save(f'{self.path}t:{infor["curre_trial_numbe"][0]}_va:{self.highe_valid_accur:.3}.h5')
+        
+        
+def retur_tp_tn_fp_fn(predi, y_true, cutof=0.5):
+    '''Classifies each curve as a true/false positive/negative. \
+Returns a list of list of indexes in the order of tp, tn, fp, fn.'''
+    if len(predi) != len(y_true):
+        raise ValueError(
+            f'The length of the prediction and y_true arrays must be the same. Currently \
+{len(predi)} and {len(y_true)} respectively.')
+    tp = []
+    tn = []
+    fp = []
+    fn = []
+    for i in range(len(predi)):
+        if predi[i] > cutof and y_true[i]:
+            tp.append(i)
+        elif predi[i] < cutof and not y_true[i]:
+            tn.append(i)
+        elif predi[i] > cutof and not y_true[i]:
+            fp.append(i)
+        else:
+            fn.append(i)
+    return [tp, tn, fp, fn]
+
+
+def graph_tp_tn_fp_fn(predi,
+                      full_datas,
+                      max_numbe_of_curve=50,
+                      cutof=0.5,
+                      featu=[],
+                      highl_injec=False,
+                      highl_cuts=False,
+                      show_signa=False,
+                      ignor_zeros=True,
+                      save_figur_path=None,
+                      figur_chara={'figsize': [15, 5]},
+                      title_chara={},
+                      x_chara={},
+                      y_chara={},
+                      legen_chara={},
+                      detec_type='plane_moon_cut_injec'):
+    '''Creates indivdual true/false positive/negative graphs.'''
+    class_type = ['tp', 'tn', 'fp', 'fn']
+    if save_figur_path is not None:
+        # Create the folders to save the different graphs
+        try:
+            os.mkdir(f'{save_figur_path}/graph')
+        except FileExistsError:
+            pass
+        for curre_type in class_type:
+            try:
+                os.mkdir(f'{save_figur_path}/graph/{curre_type}')
+            except FileExistsError:
+                pass
+
+    # Create a y_true dataset from the full information dataset
+    y_true = []
+    for i in range(len(full_datas)):
+        y_true.append(full_datas[i, -1, 1][detec_type])
+    # Classify the curves into true/false positive/negative
+    tp_tn_fp_fn_index = retur_tp_tn_fp_fn(predi, y_true, cutof)
+
+    for i in range(len(class_type)):
+        curre_numbe_save_curve = max_numbe_of_curve
+        if len(tp_tn_fp_fn_index[i]) < max_numbe_of_curve:
+            curre_numbe_save_curve = len(tp_tn_fp_fn_index[i])
+        for ii in range(curre_numbe_save_curve):
+            curre_figur_name = f"{class_type[i]}_{full_datas[tp_tn_fp_fn_index[i][ii], -1, 1]['tic_id']}"
+            show_curve(
+                full_datas,
+                start_stop_tic_id=[
+                    tp_tn_fp_fn_index[i][ii], tp_tn_fp_fn_index[i][ii] + 1
+                ],
+                featu=featu,
+                highl_injec=highl_injec,
+                highl_cuts=highl_cuts,
+                show_signa=show_signa,
+                ignor_zeros=ignor_zeros,
+                save_figur_path=f'{save_figur_path}/graph/{class_type[i]}/',
+                save_figur_name=curre_figur_name,
+                figur_chara=figur_chara,
+                title_chara=title_chara,
+                x_chara=x_chara,
+                y_chara=y_chara,
+                legen_chara=legen_chara)
+            
+            
+def deter_signa_times(signa_curve, injec_curve):
+    '''Determines the start and end injection times based on a signal and injected curve.'''
+    # Remove possible first value edge case
+    if signa_curve[0] != 1 and signa_curve[1] == 1:
+        signa_curve[0] = 1
+
+    # Find signal times
+    if len(np.where(signa_curve < 1)[0]) > 1:
+        signa_curve_index = find_signa_start_stop_index(signa_curve)
+        signa_curve_time = []
+        for i in range(len(signa_curve_index)):
+            signa_curve_time.append([
+                injec_curve[find_start(injec_curve) + signa_curve_index[i][0], 0], 
+                injec_curve[find_start(injec_curve) + signa_curve_index[i][1], 0]])
+    else:
+        signa_curve_time = [[]]
+    signa_curve_time = np.array(signa_curve_time)
+
+    return signa_curve_time
+
+def calcu_trans_lengt(curve):
+    '''Calculates the length of the transit in days from a relative flux curve'''
+    # list of all possible transit lengths
+    trans_lengt = []
+    curre_lengt = 0
+    for i in range(len(curve)):
+        if curve[i] < 1:
+            curre_lengt += 1
+        elif curre_lengt > 0:
+            trans_lengt.append(curre_lengt)
+            curre_lengt = 0
+            
+    # return the longest (i.e. most complete) transit in days
+    max_trans_lengt = max(trans_lengt)
+    trans_lengt_minut = (max_trans_lengt - 1) * 2 / 1440
+    return trans_lengt_minut
+
+# def calcu_rms(curve):
+#     '''Calculate the RMS of a curve.'''
+#     # find the data indexes within the curve
+#     useab_infor = np.where(curve[:-1, 1] != 0)[0]
+#     # Find the sum of the squares (ie x subscript i squared)
+#     total = np.sum(np.square(curve[useab_infor, 1]))
+#     # multiply sum of squares by 1 / n
+#     # and take the square root
+#     return np.sqrt(len(useab_infor) * total)
+
+def calcu_rms(curve):
+    '''Calculate the RMS of a curve.'''
+    from sklearn.metrics import mean_squared_error
+    
+    # find the data indexes within the curve
+    useab_infor = np.where(curve[:-1, 1] != 0)[0]
+    curve_actua = curve[useab_infor, 1]
+    curve_corre = np.ones(len(useab_infor))
+    rms = mean_squared_error(curve_actua, curve_corre, squared=False)
+    return rms
